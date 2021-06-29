@@ -1,0 +1,14 @@
+transformers>=4.0
+datasets
+torch
+wordfreq
+textstat
+nltk
+numpy
+wandb
+spacy # python -m spacy download en_core_web_sm
+rake-nltk
+scikit-learn
+tqdm
+python-Levenshtein
+colorama
