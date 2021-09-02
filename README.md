@@ -29,6 +29,11 @@ See the script for additional hyper-parameters. With the default hyperparameters
 
 The provided training script uses CCNews as a rudimentary demonstration dataset, and was not the one used to obtain results in our experiments (we use a larger news corpus that we cannot release due to copyright). We recommend replacing CCNews with in-domain data for better results.
 
+## Example Training Run
+
+To ease with debugging and reproducibilty, we release the log of an example training run of Keep it Simple.
+It can be accessed as a view-only [Wandb report](https://wandb.ai/phillab/simplifier_train/reports/Example-Keep-it-Simple-Run--Vmlldzo5ODg2ODY?accessToken=s5vaxrs2syn18aklu3fz3lfyho53di9p1v0qtmgsepgs34s229rymg15scntycuy).
+
 ## Running a Trained Model
 
 To simplify text with a trained model, an example script is provided:
