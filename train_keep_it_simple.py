@@ -126,7 +126,7 @@ args.experiment += "_" + freer_gpu
 wandb.init(project="keep_it_simple")
 wandb.config.update(args)
 wandb.run.name = args.experiment
-wandb.run.save()
+
 utils_misc.DoublePrint(
     "simplifier_%s_%s.log" % (args.experiment, datetime.now().strftime("%Y_%m_%d")),
     show_timings=True,
