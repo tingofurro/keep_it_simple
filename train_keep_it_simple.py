@@ -1,4 +1,8 @@
-import utils_misc, time, argparse, numpy as np, wandb
+import argparse
+import numpy as np
+import time
+import utils_misc
+import wandb
 
 freer_gpu = utils_misc.select_freer_gpu()
 
