@@ -198,7 +198,7 @@ class Lamb(Optimizer):
 
                 # Decay the first and second moment running average coefficient
                 # In-place operations to update the averages at the same time
-                exp_avg.mul_(beta1).add_(1.0 - beta1, grad)
+                exp_avg.mul_(beta1).add_(torch.tensor(1.0 - beta1), grad)
                 exp_avg_sq.mul_(beta2).addcmul_(1.0 - beta2, grad, grad)
 
                 # Inspired from cybertronai's PyTorch LAMB implementation: https://github.com/cybertronai/pytorch-lamb/blob/master/pytorch_lamb/lamb.py
