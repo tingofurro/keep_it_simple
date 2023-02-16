@@ -1,8 +1,11 @@
 import argparse
-import numpy as np
+import os
 import time
-import utils_misc
+
+import numpy as np
 import wandb
+
+import utils_misc
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -54,9 +57,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "ckpt_output_path_format",
+    "ckpt_output_path",
     type=str,
-    help="Checkpoint output file path format to use to export checkpoint.",
+    help="Checkpoint output file path to use to export checkpoint.",
 )
 
 parser.add_argument(
@@ -171,7 +174,7 @@ ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
     args.ckpt_lookback,
-    args.ckpt_output_path_format % args.experiment,
+    os.path.join(args.ckpt_output_path, args.experiment + ".bin"),
 )
 printer = utils_rl.RLExamplePrinter(
     args.print_every, N_samples, print_source=False, print_edit=True
