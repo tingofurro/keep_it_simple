@@ -3,7 +3,6 @@ import utils_misc, time, argparse, numpy as np, wandb
 freer_gpu = utils_misc.select_freer_gpu()
 
 from torch.utils.data import DataLoader, RandomSampler
-from apex import amp
 
 from model_salience import CoverageModel
 from model_fluency import FluencyRelativeScore, TextDiscriminator
@@ -19,6 +18,13 @@ from model_generator import Generator
 from datasets import load_dataset
 from datetime import datetime
 import torch
+
+try:
+    from torch.cuda import amp
+
+    use_torch_amp = True
+except ImportError:
+    use_torch_amp = False
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -146,12 +152,6 @@ optimizer = utils_optim.build_optimizer(
     learning_rate=args.learning_rate,
 )
 
-use_apex = True
-if use_apex:
-    simplifier.model, optimizer = amp.initialize(
-        simplifier.model, optimizer, opt_level="O2"
-    )  # O1 is really not good, according to experiments on 10/13/2020
-
 ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
@@ -163,7 +163,7 @@ printer = utils_rl.RLExamplePrinter(
 )
 timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
-rl_crit = utils_rl.ReinforceCriterion(simplifier, optimizer, use_apex=use_apex)
+rl_crit = utils_rl.ReinforceCriterion(simplifier, optimizer, use_apex=use_torch_amp)
 
 scorers = [
     {
