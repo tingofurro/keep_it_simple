@@ -41,3 +41,32 @@ if use_torch_amp:
         simplifier.model, optimizer, opt_level="O2"
     )  # O1 is really not good, according to experiments on 10/13/2020
 ```
+
+# Deprecated Fix
+
+## `add_`
+
+Deprecated warning of the `add_` method in `utils_optim.py`:
+
+```shell
+optim.py:201: UserWarning: This overload of add_ is deprecated: add_(Number alpha, Tensor other)
+Consider using one of the following signatures instead: add_(Tensor other, *, Number alpha) 
+(Triggered internally at ../torch/csrc/utils/python_arg_parser.cpp:1420.) exp_avg.mul_(beta1).add_(1.0 - beta1, grad)
+```
+
+Fixed by the following `exp_avg.mul_(beta1).add_(grad, alpha=1.0 - beta1)` for all `add_` call.
+
+See [here](https://discuss.pytorch.org/t/userwarning-this-overload-of-add-addcmul-addcdiv-is-deprecated-errors-while-implementing-sharedadam/99802)
+for more details.
+
+## `AdamW`
+
+Deprecated warning of the `transformers.adamW` in `utils_optim.py`:
+
+```shell
+FutureWarning: This implementation of AdamW is deprecated and will be removed in a 
+future version. Use the PyTorch implementation torch.optim.AdamW instead, or set 
+$(no_deprecation_warning=True) to disable this warning
+```
+
+Fixed by removing `transformer.AdamW` by recommended `torch.optim.adamw`.

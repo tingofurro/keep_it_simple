@@ -198,8 +198,10 @@ class Lamb(Optimizer):
 
                 # Decay the first and second moment running average coefficient
                 # In-place operations to update the averages at the same time
-                exp_avg.mul_(beta1).add_(torch.tensor(1.0 - beta1), grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1.0 - beta2, grad, grad)
+                # See here for details of the order of add_ and addcmul_
+                # https://discuss.pytorch.org/t/userwarning-this-overload-of-add-addcmul-addcdiv-is-deprecated-errors-while-implementing-sharedadam/99802
+                exp_avg.mul_(beta1).add_(grad, alpha=1.0 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1.0 - beta2)
 
                 # Inspired from cybertronai's PyTorch LAMB implementation: https://github.com/cybertronai/pytorch-lamb/blob/master/pytorch_lamb/lamb.py
                 step_size = group["lr"]
@@ -207,7 +209,7 @@ class Lamb(Optimizer):
 
                 adam_step = exp_avg / exp_avg_sq.sqrt().add(group["eps"])
                 if group["weight_decay"] != 0:
-                    adam_step.add_(group["weight_decay"], p.data)
+                    adam_step.add_(p.data, alpha=group["weight_decay"])
 
                 adam_norm = adam_step.pow(2).sum().sqrt()
                 if weight_norm == 0 or adam_norm == 0:
@@ -219,5 +221,5 @@ class Lamb(Optimizer):
                 state["adam_norm"] = adam_norm
                 state["trust_ratio"] = trust_ratio
 
-                p.data.add_(-step_size * trust_ratio, adam_step)
+                p.data.add_(adam_step, alpha=-step_size * trust_ratio)
         return loss
