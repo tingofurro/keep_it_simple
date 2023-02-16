@@ -45,6 +45,11 @@ parser.add_argument(
     type=str,
     help="Coverage model bin file path.",
 )
+parser.add_argument(
+    "ckpt_output_path_format",
+    type=str,
+    help="Checkpoint output file path format to use to export checkpoint.",
+)
 
 # Generator
 parser.add_argument(
@@ -164,7 +169,7 @@ ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
     args.ckpt_lookback,
-    "/home/phillab/models/simplifier/%s.bin" % (args.experiment),
+    args.ckpt_output_path_format % args.experiment,
 )
 printer = utils_rl.RLExamplePrinter(
     args.print_every, N_samples, print_source=False, print_edit=True

@@ -73,7 +73,7 @@ For example, the following command start the training with the experiment name `
 model and GPT2-like model.
 
 ```shell
-python train_keep_it_simple.py initial_run ./dependencies_model/coverage_roberta.bin ./dependencies_model/gpt2_med_cp90.bin 
+python train_keep_it_simple.py initial_run ./dependencies_model/coverage_roberta.bin ./dependencies_model/gpt2_med_cp90.bin ./models/simplifier/%s.bin
 ```
 
 See the script for additional hyper-parameters. With the default hyperparameters provided, the script should converge
