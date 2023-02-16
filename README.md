@@ -14,7 +14,7 @@ This repository contains the code for ACL2021 paper: [Keep It Simple: Unsupervis
 
 The easiest way to use the model is through the hosted Hub model: https://huggingface.co/philippelaban/keep_it_simple
 The basic use would be:
-```
+``` python
 tokenizer = AutoTokenizer.from_pretrained("philippelaban/keep_it_simple")
 kis_model = AutoModelForCausalLM.from_pretrained("philippelaban/keep_it_simple")
 ```
@@ -23,7 +23,7 @@ See the model card for a detailed example.
 ### Manual approach 
 
 To simplify text with a trained model, an example script is provided:
-```
+``` python
 python run_keep_it_simple.py --model_card gpt2-medium --model_file /home/phillab/models/ACL2021/gpt2_med_keep_it_simple.bin
 ```
 
@@ -37,7 +37,7 @@ In the [Keep it Simple Release](https://github.com/tingofurro/keep_it_simple/rel
 
 The `requirements.txt` provides the list of pip packages required to use and train models.
 One must also install a spaCy model:
-```
+``` python
 python -m spacy download en_core_web_sm
 ```
 
@@ -50,8 +50,8 @@ For training, two pre-trained models are needed, which we provide in the [Keep i
 - `gpt2_med_cp90.bin`: A model compatible with a `gpt2-medium` of the GPT2 HuggingFace implementation, used as the initial model for the generator.
 
 Once the packages are installed, and the models are downloaded, the training script can be run:
-```
-python train_keep_it_simple.py --experiment initial_run --model_start_file /path/to/gpt2_med_cp90.bin
+``` python
+python train_keep_it_simple.py experiment initial_run model_start_file /path/to/gpt2_med_cp90.bin coverage_model_path /path/to/coverage_roberta.bin
 ```
 
 See the script for additional hyper-parameters. With the default hyperparameters provided, the script should converge within 16-24 hours to a model achieving a strong (yet not optimal) score, when trained using a single V-100 or equivalent.

@@ -22,10 +22,16 @@ import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--experiment",
+    "experiment",
     type=str,
     required=True,
     help="Experiment name. Will be used to save a model file and a log file.",
+)
+parser.add_argument(
+    "coverage_model_path",
+    required=True,
+    type=str,
+    help="Coverage model bin file path.",
 )
 
 # Generator
@@ -36,7 +42,7 @@ parser.add_argument(
     help="What folder contains the model configuration.",
 )
 parser.add_argument(
-    "--model_start_file",
+    "model_start_file",
     required=True,
     type=str,
     help="Starting model file of the generator.",
@@ -167,7 +173,7 @@ scorers = [
         "name": "coverage",
         "model": CoverageModel(
             "nostop",
-            model_file="/home/phillab/models/coverage_roberta.bin",
+            model_file=args.coverage_model_path,
             fp16=True,
             is_soft=True,
         ),
