@@ -1,4 +1,4 @@
-from transformers.optimization import AdamW
+from torch.optim.AdamW import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.optim import Optimizer, SGD
 from torch import nn
