@@ -23,6 +23,10 @@ from datasets import load_dataset
 from datetime import datetime
 import torch
 
+from transformers import logging
+
+logging.set_verbosity_error()
+
 try:
     from torch.cuda import amp
 
