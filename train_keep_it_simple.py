@@ -40,15 +40,15 @@ parser.add_argument(
 
 # Generator
 parser.add_argument(
+    "model_start_file",
+    type=str,
+    help="Starting model file of the generator.",
+)
+parser.add_argument(
     "--model_card",
     type=str,
     default="gpt2-medium",
     help="What folder contains the model configuration.",
-)
-parser.add_argument(
-    "model_start_file",
-    type=str,
-    help="Starting model file of the generator.",
 )
 parser.add_argument(
     "--max_seq_length",
