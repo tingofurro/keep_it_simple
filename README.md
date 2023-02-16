@@ -1,3 +1,5 @@
+> In Python 3.8
+
 # Keep it Simple (KiS)
 
 This repository contains the code for ACL2021 paper: [Keep It Simple: Unsupervised Simplification of Multi-Paragraph Text](https://tingofurro.github.io/pdfs/ACL2021_Keep_It_Simple.pdf).
