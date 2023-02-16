@@ -51,7 +51,7 @@ For training, two pre-trained models are needed, which we provide in the [Keep i
 
 Once the packages are installed, and the models are downloaded, the training script can be run:
 ``` python
-python train_keep_it_simple.py experiment initial_run model_start_file /path/to/gpt2_med_cp90.bin coverage_model_path /path/to/coverage_roberta.bin
+python train_keep_it_simple.py initial_run ./dependencies_model/coverage_roberta.bin ./dependencies_model/gpt2_med_cp90.bin 
 ```
 
 See the script for additional hyper-parameters. With the default hyperparameters provided, the script should converge within 16-24 hours to a model achieving a strong (yet not optimal) score, when trained using a single V-100 or equivalent.
