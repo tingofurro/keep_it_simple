@@ -1,6 +1,11 @@
-import time, numpy as np, torch
+import numpy as np
+import time
+import torch
 from datetime import datetime
-from apex import amp
+
+from torch.cuda import amp
+from torch.cuda.amp import GradScaler, autocast
+
 import utils_edits
 
 
@@ -27,7 +32,10 @@ class ReinforceCriterion:
         self.generator = generator
         self.optimizer = optimizer
         self.eos_id = self.generator.tokenizer.eos_token_id
-        self.use_apex = use_apex
+
+        self.scaler = None
+        if use_apex:
+            self.scaler = GradScaler()
 
     def __call__(self, encoded_inputs, decoded_tokens, rewards):
         # Note: rewards should already be an advantage (reward - baseline)
@@ -39,19 +47,30 @@ class ReinforceCriterion:
             len(decoded_tokens),
         )
 
-        logits = self.generator.train_batch(
-            encoded_inputs, decoded_tokenized=decoded_tokens, return_logits=True
-        )
-        selected_logprobs = select_logprobs(logits, decoded_tokens, self.eos_id)
+        if self.scaler is not None:
+            with autocast(dtype=torch.float16):
+                logits = self.generator.train_batch(
+                    encoded_inputs, decoded_tokenized=decoded_tokens, return_logits=True
+                )
+                selected_logprobs = select_logprobs(logits, decoded_tokens, self.eos_id)
 
-        loss = torch.mean(rewards * selected_logprobs)
-        if self.use_apex:
-            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                scaled_loss.backward()
+                loss = torch.mean(rewards * selected_logprobs)
+
+            self.scaler.scale(loss).backward()
+            self.scaler.step(optimizer=self.optimizer)
+            self.scaler.update()
         else:
+            logits = self.generator.train_batch(
+                encoded_inputs, decoded_tokenized=decoded_tokens, return_logits=True
+            )
+            selected_logprobs = select_logprobs(logits, decoded_tokens, self.eos_id)
+
+            loss = torch.mean(rewards * selected_logprobs)
+
             loss.backward()
-        self.optimizer.step()
-        self.optimizer.zero_grad()
+            self.optimizer.step()
+
+        self.optimizer.zero_grad()  # TODO: Pas sur si ici ou avant
         return loss
 
 
