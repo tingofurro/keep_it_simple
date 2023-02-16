@@ -24,12 +24,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "experiment",
     type=str,
-    required=True,
     help="Experiment name. Will be used to save a model file and a log file.",
 )
 parser.add_argument(
     "coverage_model_path",
-    required=True,
     type=str,
     help="Coverage model bin file path.",
 )
@@ -43,7 +41,6 @@ parser.add_argument(
 )
 parser.add_argument(
     "model_start_file",
-    required=True,
     type=str,
     help="Starting model file of the generator.",
 )
