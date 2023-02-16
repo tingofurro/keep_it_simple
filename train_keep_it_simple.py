@@ -45,11 +45,6 @@ parser.add_argument(
     type=str,
     help="Coverage model bin file path.",
 )
-parser.add_argument(
-    "ckpt_output_path_format",
-    type=str,
-    help="Checkpoint output file path format to use to export checkpoint.",
-)
 
 # Generator
 parser.add_argument(
@@ -57,6 +52,13 @@ parser.add_argument(
     type=str,
     help="Starting model file of the generator.",
 )
+
+parser.add_argument(
+    "ckpt_output_path_format",
+    type=str,
+    help="Checkpoint output file path format to use to export checkpoint.",
+)
+
 parser.add_argument(
     "--model_card",
     type=str,
