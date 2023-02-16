@@ -5,13 +5,13 @@ import sys
 
 # GPU-related business
 def get_freer_gpu():
-    os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp_smi')
+    os.system('nvidia-smi -q -d Memory |grep -A5 GPU | grep Free > tmp_smi')
     memory_available = [int(x.split()[2])+5*i for i, x in enumerate(open('tmp_smi', 'r').readlines())]
     os.remove("tmp_smi")
     return np.argmax(memory_available)
 
 def any_gpu_with_space(gb_needed):
-    os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp_smi')
+    os.system('nvidia-smi -q -d Memory |grep -A5 GPU | grep Free > tmp_smi')
     memory_available = [float(x.split()[2])/1024.0 for i, x in enumerate(open('tmp_smi', 'r').readlines())]
     os.remove("tmp_smi")
     return any([mem >= gb_needed for mem in memory_available])
