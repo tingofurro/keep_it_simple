@@ -4,21 +4,26 @@ import textstat, numpy as np, nltk, torch
 # we have a target shift. If you go beyond that, you should get penalized, but at a slower rate (right_slope).
 def shift_to_score(shift, target_shift, right_slope=0.25):
     if shift <= target_shift:
-        score = shift / (target_shift+0.001)
+        score = shift / (target_shift + 0.001)
     else:
-        score = 1.0 - right_slope * (shift - target_shift) / (target_shift+0.001)
+        score = 1.0 - right_slope * (shift - target_shift) / (target_shift + 0.001)
     return np.clip(score, 0, 1.0)
+
 
 # Vocab (V) and Readability (R) Shift models
 class SimplicityLexicalScore:
     def __init__(self, target_shift=0.4, word_change_ratio=0.1):
         self.target_shift = target_shift
-        self.word_change_ratio = word_change_ratio # Number of words that we expect to be swapped
+        self.word_change_ratio = (
+            word_change_ratio  # Number of words that we expect to be swapped
+        )
 
-        self.stopws = set(nltk.corpus.stopwords.words("english") + ["might", "would", "``"])
+        self.stopws = set(
+            nltk.corpus.stopwords.words("english") + ["might", "would", "``"]
+        )
 
     def word_score_func(self, w):
-        return zipf_frequency(w, 'en', wordlist="large")
+        return zipf_frequency(w, "en", wordlist="large")
 
     def is_good_word(self, w):
         if "'" in w:
@@ -43,25 +48,50 @@ class SimplicityLexicalScore:
 
         vocab_shift = 0.0
         if target_n_words == 0:
-            vocab_shift = 1.0 # You're not expected to have done any shifts yet
+            vocab_shift = 1.0  # You're not expected to have done any shifts yet
         elif len(removed_words) > 0 and len(added_words) > 0:
             # The idea of this is that we should consider only the K most complicated words removed
             # And by what top K most complicated they were replaced with.
             # The idea being that adding a bunch of simple words, or removing simple words doesn't matter beyond a certain point.
 
-            added_words_zipfs = [{"w": w, "zipf": self.word_score_func(w)} for w in added_words]
-            removed_words_zipfs = [{"w": w, "zipf": self.word_score_func(w)} for w in removed_words]
-            added_words_zipfs = sorted(added_words_zipfs, key=lambda x: x['zipf'])
-            removed_words_zipfs = sorted(removed_words_zipfs, key=lambda x: x['zipf'])[:target_n_words]
+            added_words_zipfs = [
+                {"w": w, "zipf": self.word_score_func(w)} for w in added_words
+            ]
+            removed_words_zipfs = [
+                {"w": w, "zipf": self.word_score_func(w)} for w in removed_words
+            ]
+            added_words_zipfs = sorted(added_words_zipfs, key=lambda x: x["zipf"])
+            removed_words_zipfs = sorted(removed_words_zipfs, key=lambda x: x["zipf"])[
+                :target_n_words
+            ]
 
-            removed_avg_zipfs = np.mean([x['zipf'] for x in removed_words_zipfs[:target_n_words]])
-            added_avg_zipfs = np.mean([x['zipf'] for x in added_words_zipfs[:min(target_n_words, len(removed_words_zipfs))]])
+            removed_avg_zipfs = np.mean(
+                [x["zipf"] for x in removed_words_zipfs[:target_n_words]]
+            )
+            added_avg_zipfs = np.mean(
+                [
+                    x["zipf"]
+                    for x in added_words_zipfs[
+                        : min(target_n_words, len(removed_words_zipfs))
+                    ]
+                ]
+            )
             if printing:
                 print("Desired # word swaps: %d" % (target_n_words))
-                print("[Avg Zipf: %.3f] Added words:" % (added_avg_zipfs), added_words_zipfs)
-                print("[Avg Zipf: %.3f] Removed words:" % (removed_avg_zipfs), removed_words_zipfs)
+                print(
+                    "[Avg Zipf: %.3f] Added words:" % (added_avg_zipfs),
+                    added_words_zipfs,
+                )
+                print(
+                    "[Avg Zipf: %.3f] Removed words:" % (removed_avg_zipfs),
+                    removed_words_zipfs,
+                )
 
-            vocab_shift = (added_avg_zipfs - removed_avg_zipfs) * len(removed_words_zipfs) / target_n_words
+            vocab_shift = (
+                (added_avg_zipfs - removed_avg_zipfs)
+                * len(removed_words_zipfs)
+                / target_n_words
+            )
 
         return vocab_shift, len(added_words), len(removed_words)
 
@@ -71,9 +101,11 @@ class SimplicityLexicalScore:
         n_adds, n_dels = [], []
         for source, generated in zip(sources, generateds):
             if partial:
-                source = " ".join(source.split(" ")[:generated.count(" ")])
+                source = " ".join(source.split(" ")[: generated.count(" ")])
 
-            vshift, n_add, n_del = self.vocab_shift_score(source, generated, printing=printing)
+            vshift, n_add, n_del = self.vocab_shift_score(
+                source, generated, printing=printing
+            )
             score = shift_to_score(vshift, self.target_shift)
 
             vshifts.append(vshift)
@@ -86,7 +118,13 @@ class SimplicityLexicalScore:
 
         if printing:
             print("[vshift]", scores)
-        return {"scores": scores, "n_w_adds": n_adds, "n_w_dels": n_dels, "vshifts": vshifts}
+        return {
+            "scores": scores,
+            "n_w_adds": n_adds,
+            "n_w_dels": n_dels,
+            "vshifts": vshifts,
+        }
+
 
 class SimplicitySyntacticScore:
     def __init__(self):
@@ -99,9 +137,9 @@ class SimplicitySyntacticScore:
         if rsource <= 4.0:
             return 0
         elif rsource <= 12.0:
-            return (rsource-3) * 0.5
+            return (rsource - 3) * 0.5
 
-        return 4.5 + (rsource-12) * 0.83
+        return 4.5 + (rsource - 12) * 0.83
 
     def readability_shift_score(self, txt1, txt2):
         score1 = textstat.flesch_kincaid_grade(txt1)
@@ -113,7 +151,7 @@ class SimplicitySyntacticScore:
         rshifts, rsources, rtargets = [], [], []
         for source, generated in zip(sources, generateds):
             if partial:
-                source = " ".join(source.split(" ")[:generated.count(" ")])
+                source = " ".join(source.split(" ")[: generated.count(" ")])
 
             rsource, rtarget = self.readability_shift_score(source, generated)
             rshift = rsource - rtarget
@@ -130,4 +168,9 @@ class SimplicitySyntacticScore:
 
         if printing:
             print("[rshift]", scores)
-        return {"scores": scores, "rshifts": rshifts, "rsources": rsources, "rtargets": rtargets}
+        return {
+            "scores": scores,
+            "rshifts": rshifts,
+            "rsources": rsources,
+            "rtargets": rtargets,
+        }

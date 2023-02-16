@@ -2,6 +2,7 @@ from collections import Counter
 import nltk, spacy, numpy as np
 from rake_nltk import Rake
 
+
 def get_pos_group(idx):
     if idx == 1:
         return ["AUX", "VERB", "PART"]
@@ -10,10 +11,12 @@ def get_pos_group(idx):
     elif idx == 3:
         return ["ADJ", "ADV", "ADP", "INTJ", "SCONJ"]
 
+
 def mask_tokens(tokens, kw_idxs, mask_idx=0):
     masked = [tok if tok not in kw_idxs else 0 for tok in tokens]
     is_masked = [0 if tok not in kw_idxs else 1 for tok in tokens]
     return masked, is_masked
+
 
 def args2mask(args):
     if args.masking_strategy == "kw":
@@ -23,17 +26,23 @@ def args2mask(args):
         print("Masking strategy pos: %d" % (args.masking_pos_group))
         masking_model = POSMasker(get_pos_group(args.masking_pos_group))
     elif args.masking_strategy == "ratio":
-        print("Masking strategy fixed ratio: %d; offset: %d" % (args.fixed_mask_ratio, args.fixed_mask_offset))
-        masking_model = RatioMasker(k_ratio=args.fixed_mask_ratio, start_offset=args.fixed_mask_offset)
+        print(
+            "Masking strategy fixed ratio: %d; offset: %d"
+            % (args.fixed_mask_ratio, args.fixed_mask_offset)
+        )
+        masking_model = RatioMasker(
+            k_ratio=args.fixed_mask_ratio, start_offset=args.fixed_mask_offset
+        )
     elif args.masking_strategy == "nostop":
         print("Masking strategy non-stop words all masked")
         masking_model = NonStopMasker()
     return masking_model
 
+
 def string2mask(masker_name):
     if masker_name[:2] == "kw":
         # kw30
-        return KeywordMasker(mask_ratio=int(masker_name[2:])/100.0)
+        return KeywordMasker(mask_ratio=int(masker_name[2:]) / 100.0)
     elif masker_name[:3] == "pos":
         # pos1, pos2, pos3
         return POSMasker(get_pos_group(masker_name[3:]))
@@ -50,6 +59,7 @@ def string2mask(masker_name):
         print("Could not match to a masker model")
         return None
 
+
 class Masker:
     def __init__(self):
         self.model_tokenizer = None
@@ -59,6 +69,7 @@ class Masker:
 
     def compute_effective_mask_ratio(self, is_masked):
         return np.mean([np.mean(is_m) for is_m in is_masked])
+
 
 class NonStopMasker(Masker):
     def __init__(self):
@@ -73,7 +84,7 @@ class NonStopMasker(Masker):
             words = nltk.tokenize.word_tokenize(sentence)
             even = 0
             for w in words:
-                toks = self.model_tokenizer.encode(" "+w, add_special_tokens=False)
+                toks = self.model_tokenizer.encode(" " + w, add_special_tokens=False)
                 ums += toks
                 even += 1
                 if w.lower() not in self.stop_ws and even % 2 == 0:
@@ -87,9 +98,28 @@ class NonStopMasker(Masker):
             is_masked.append(ims)
         return unmasked, masked, is_masked, self.compute_effective_mask_ratio(is_masked)
 
+
 class KeywordMasker(Masker):
     def __init__(self, mask_ratio=0.2):
-        self.stopws = set(nltk.corpus.stopwords.words("english") + [",", "''", "--", "-", ".", "(", ")", ";", "mr", "says", "say", "said", "will", "would"])
+        self.stopws = set(
+            nltk.corpus.stopwords.words("english")
+            + [
+                ",",
+                "''",
+                "--",
+                "-",
+                ".",
+                "(",
+                ")",
+                ";",
+                "mr",
+                "says",
+                "say",
+                "said",
+                "will",
+                "would",
+            ]
+        )
         self.r = Rake()
         self.mask_ratio = mask_ratio
 
@@ -109,14 +139,17 @@ class KeywordMasker(Masker):
         # new_sent = self.model_tokenizer.encode(sentence, add_special_tokens=False)
 
         words = nltk.tokenize.word_tokenize(sentence)
-        num_to_mask = int((self.mask_ratio * len(words))+0.5)
+        num_to_mask = int((self.mask_ratio * len(words)) + 0.5)
 
-        all_my_masks = sorted([w.lower() for w in words if w.lower() in document_keywords], key=lambda w: document_keywords.index(w))
+        all_my_masks = sorted(
+            [w.lower() for w in words if w.lower() in document_keywords],
+            key=lambda w: document_keywords.index(w),
+        )
         my_selected_masks = set(all_my_masks[:num_to_mask])
 
         ums, ms, ims = [], [], []
         for w in words:
-            toks = self.model_tokenizer.encode(" "+w, add_special_tokens=False)
+            toks = self.model_tokenizer.encode(" " + w, add_special_tokens=False)
             ums += toks
             if w.lower() in my_selected_masks:
                 ms += [0] * len(toks)
@@ -128,7 +161,9 @@ class KeywordMasker(Masker):
         return ums, ms, ims
 
     def mask(self, sentences):
-        assert self.model_tokenizer is not None, "Forgot to register the model tokenizer being used. Without it, it will not be possible to generate the outputs encoded for the model."
+        assert (
+            self.model_tokenizer is not None
+        ), "Forgot to register the model tokenizer being used. Without it, it will not be possible to generate the outputs encoded for the model."
         unmasked, masked, is_masked = [], [], []
 
         if len(sentences) == 0:
@@ -145,6 +180,7 @@ class KeywordMasker(Masker):
 
         return unmasked, masked, is_masked, self.compute_effective_mask_ratio(is_masked)
 
+
 class POSMasker(Masker):
     def __init__(self, poses):
         # ADJ: adjective, ADP: adposition, ADV: adverb, AUX: auxiliary verb, CONJ: coordinating conjunction, DET: determiner, INTJ: interjection,
@@ -158,7 +194,9 @@ class POSMasker(Masker):
         # doc = self.nlp(sentence)
         unmasked, masked, is_masked = [], [], []
         for w in sent_doc:
-            word_toks = self.model_tokenizer.encode(" "+w.text, add_special_tokens=False)
+            word_toks = self.model_tokenizer.encode(
+                " " + w.text, add_special_tokens=False
+            )
             unmasked += word_toks
             if w.pos_ in self.poses:
                 masked += [0] * len(word_toks)
@@ -170,7 +208,9 @@ class POSMasker(Masker):
         return unmasked, masked, is_masked
 
     def mask(self, sentences):
-        assert self.model_tokenizer is not None, "Forgot to register the model tokenizer being used. Without it, it will not be possible to generate the outputs encoded for the model."
+        assert (
+            self.model_tokenizer is not None
+        ), "Forgot to register the model tokenizer being used. Without it, it will not be possible to generate the outputs encoded for the model."
         unmasked, masked, is_masked = [], [], []
 
         if len(sentences) == 0:
@@ -185,6 +225,7 @@ class POSMasker(Masker):
 
         return unmasked, masked, is_masked, self.compute_effective_mask_ratio(is_masked)
 
+
 class RatioMasker(Masker):
     def __init__(self, k_ratio=3, start_offset=0):
         self.k_ratio = k_ratio
@@ -196,18 +237,20 @@ class RatioMasker(Masker):
         unmasked, masked, is_masked = [], [], []
         for i, w in enumerate(words):
             unmasked.append(w)
-            if (i+offset) % self.k_ratio == 0:
+            if (i + offset) % self.k_ratio == 0:
                 masked.append(0)
                 is_masked.append(1)
             else:
                 masked.append(w)
                 is_masked.append(0)
 
-        new_offset = (len(words)+offset) % self.k_ratio
+        new_offset = (len(words) + offset) % self.k_ratio
         return unmasked, masked, is_masked, new_offset
 
     def mask(self, sentences):
-        assert self.model_tokenizer is not None, "Forgot to register the model tokenizer being used. Without it, it will not be possible to generate the outputs encoded for the model."
+        assert (
+            self.model_tokenizer is not None
+        ), "Forgot to register the model tokenizer being used. Without it, it will not be possible to generate the outputs encoded for the model."
         unmasked, masked, is_masked = [], [], []
 
         if len(sentences) == 0:
