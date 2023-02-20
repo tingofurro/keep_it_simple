@@ -42,6 +42,10 @@ if use_torch_amp:
     )  # O1 is really not good, according to experiments on 10/13/2020
 ```
 
+4. Fixed default training that use `"logsum"` instead or `"prod"` as per article. The cli now use `"prod"` as the
+   default configuration.
+5. Fixed the k value (`"--num_runs"`) default value to 8 as per article (was 10 before).
+
 # Deprecated Fix
 
 ## `add_`

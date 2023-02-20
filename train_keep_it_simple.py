@@ -77,13 +77,14 @@ parser.add_argument(
 parser.add_argument(
     "--num_runs",
     type=int,
-    default=10,
+    default=8,
     help="For each element in the batch, how many independent runs to have; The `k` of k-SCST",
 )
 parser.add_argument(
     "--scoring",
     type=str,
-    default="logsum",
+    default="product",
+    choices=["product", "logsum"],
     help="The way individual scores are aggregated into a total score. Can be `product` or `logsum`",
 )
 
