@@ -300,7 +300,14 @@ for epoch_i in range(30):
         }
         log_obj.update(
             {
-                k: np.mean(v)
+                f"mean_{k}": np.mean(v)
+                for k, v in scorer_returns.items()
+                if "_scores" in k or k in ["fluency_disc_val_f1"]
+            }
+        )
+        log_obj.update(
+            {
+                k: v
                 for k, v in scorer_returns.items()
                 if "_scores" in k or k in ["fluency_disc_val_f1"]
             }
