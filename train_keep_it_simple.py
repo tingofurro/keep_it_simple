@@ -242,6 +242,7 @@ T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
 for epoch_i in range(30):
+    wandb.log({"Epoch": epoch_i})
     for ib, paragraphs in enumerate(dataloader):
         T_batch_start = time.time()
         gene_params = {
@@ -293,8 +294,6 @@ for epoch_i in range(30):
         temperature = thermostat.log_diversity(diversity)
         loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
         timer.tick("optim")
-
-        wandb.log({"Epoch": epoch_i})
 
         batch_time = time.time() - T_batch_start
         log_obj = {
