@@ -293,6 +293,8 @@ for epoch_i in range(30):
         loss = rl_crit(unlooped_paragraphs, generateds_tokenized, normalized_rewards)
         timer.tick("optim")
 
+        wandb.log({"Epoch": epoch_i})
+
         batch_time = time.time() - T_batch_start
         log_obj = {
             "loss": loss,
