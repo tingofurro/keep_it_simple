@@ -6,7 +6,7 @@ textstat
 nltk
 numpy
 wandb
-spacy # python -m spacy download en_core_web_sm
+spacy
 rake-nltk
 scikit-learn
 tqdm

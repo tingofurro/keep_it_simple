@@ -49,8 +49,19 @@ One must also install a spaCy model:
 python -m spacy download en_core_web_sm
 ```
 
-Must also manually install the `apex` library, used for mixed-precision training (see: https://github.com/nvidia/apex),
-as it is not avaiable on pip.
+and `nltk` stopwords:
+
+```python
+import nltk
+
+nltk.download('stopwords')
+```
+
+or use the `setup.py` install script using:
+
+```shell
+python setup.py
+```
 
 ### Training Script
 
