@@ -271,26 +271,27 @@ for epoch_i in range(30):
         timer.tick("sampled_generation")
 
         scorer_returns = scorer.score(unlooped_paragraphs, generateds)
-        total_scores = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-        batch_scores = total_scores.reshape(args.train_batch_size, N_samples)
-        mean_scores = batch_scores.mean(dim=1)
-        max_scores = torch.max(batch_scores, dim=1).values  # For logging
-        unlooped_mean_scores = torch.repeat_interleave(mean_scores, N_samples)
+        # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
+        RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
+
+        batch_RS_j = RS_j.reshape(args.train_batch_size, N_samples)
+        R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
 
         timer.tick("all_scores")
-        normalized_rewards = unlooped_mean_scores - total_scores
-        n_diff_pos, n_diff_neg = (normalized_rewards < -0.02).long().sum().item(), (
-            normalized_rewards > 0.02
+        # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
+        first_loss_term = R_Overline_S - batch_RS_j
+        n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
+            first_loss_term > 0.02
         ).long().sum().item()
         print(
-            "[%d samples] %d above avg and %d below avg"
+            "[%d samples] %d above avg and %d below avg with a 0.02 margin."
             % (args.train_batch_size * N_samples, n_diff_pos, n_diff_neg)
         )
 
         diversity = len(set(generateds)) / len(generateds)
         temperature = thermostat.log_diversity(diversity)
-        loss = rl_crit(unlooped_paragraphs, generateds_tokenized, normalized_rewards)
+        loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
         timer.tick("optim")
 
         wandb.log({"Epoch": epoch_i})
@@ -298,7 +299,7 @@ for epoch_i in range(30):
         batch_time = time.time() - T_batch_start
         log_obj = {
             "loss": loss,
-            "max_scores": max_scores.mean().item(),
+            "max_scores": torch.max(RS_j),
             "temperature": temperature,
             "elem_per_sec": (len(generateds) / (batch_time + 0.001)),
         }
