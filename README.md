@@ -49,12 +49,13 @@ One must also install a spaCy model:
 python -m spacy download en_core_web_sm
 ```
 
-and `nltk` stopwords:
+and `nltk` stopwords and punkt:
 
 ```python
 import nltk
 
 nltk.download('stopwords')
+nltk.download('punkt')
 ```
 
 or use the `setup.py` install script using:

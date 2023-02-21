@@ -8,5 +8,6 @@ subprocess.check_call(
 import nltk
 
 nltk.download("stopwords")
+nltk.download("punkt")
 
 subprocess.check_call(["python", "-m", "spacy", "download", "en_core_web_sm"])
