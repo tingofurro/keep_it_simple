@@ -93,7 +93,8 @@ parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning 
 parser.add_argument(
     "--optimizer_name",
     type=str,
-    default="lamb",
+    default="adam",
+    choices=["adam", "lamb"],
     help="Two options for now: `adam` and `lamb`",
 )
 parser.add_argument(

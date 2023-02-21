@@ -45,6 +45,8 @@ if use_torch_amp:
 4. Fixed default training that use `"logsum"` instead or `"prod"` as per article. The cli now use `"prod"` as the
    default configuration.
 5. Fixed the k value (`"--num_runs"`) default value to 8 as per article (was 10 before).
+6. Fixed the default value of the optimizer (`"--optimizer"`) from `"lamb"` to default value `"adam"` as per article.
+   Also, removed default argument value in optimizer factory.
 
 # Deprecated Fix
 

@@ -137,7 +137,7 @@ class TextDiscriminator:
             "roberta-base"
         ).to("cuda")
         self.optimizer = utils_optim.build_optimizer(
-            self.discriminator, learning_rate=1e-5
+            self.discriminator, learning_rate=1e-5, optimizer_name="adam"
         )
 
         label_counter = Counter(labels)

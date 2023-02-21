@@ -5,7 +5,7 @@ from torch import nn
 import math, torch
 
 
-def build_optimizer(model, optimizer_name="adam", learning_rate=1e-5):
+def build_optimizer(model, optimizer_name: str, learning_rate: float):
     param_optimizer = list(model.named_parameters())
     no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
@@ -26,8 +26,6 @@ def build_optimizer(model, optimizer_name="adam", learning_rate=1e-5):
         optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate)
     elif optimizer_name == "lamb":
         optimizer = Lamb(optimizer_grouped_parameters, lr=learning_rate)
-    elif optimizer_name == "sgd":
-        optimizer = SGD(optimizer_grouped_parameters, lr=learning_rate)
     else:
         assert False, "optimizer_name = '%s' is not `adam` or `lamb`" % (optimizer_name)
     return optimizer
