@@ -1,5 +1,6 @@
 import argparse
 import os
+import socket
 import time
 
 import numpy as np
@@ -126,7 +127,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-args.experiment += "_" + freer_gpu
+args.experiment += "_" + freer_gpu + "_" + socket.gethostname()
 
 wandb.init(project="keep_it_simple")
 wandb.config.update(args)
