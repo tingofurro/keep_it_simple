@@ -3,6 +3,7 @@ from datetime import datetime
 from colorama import Fore
 import sys
 
+
 # GPU-related business
 def get_freer_gpu():
     os.system("nvidia-smi -q -d Memory |grep -A5 GPU | grep Free > tmp_smi")

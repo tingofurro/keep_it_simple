@@ -242,91 +242,89 @@ scorer = utils_scoring.ScorerWrapper(
 T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
-for epoch_i in range(30):
-    wandb.log({"Epoch": epoch_i})
-    for ib, paragraphs in enumerate(dataloader):
-        T_batch_start = time.time()
-        gene_params = {
-            "max_output_length": args.max_seq_length,
-            "sample": True,
-            "num_runs": args.num_runs,
-            "no_repeat_ngram": 5,
-            "max_batch_size": 12,
-            "no_copy_ngram": 7,
-            "temperature": temperature,
+for ib, paragraphs in enumerate(dataloader):
+    T_batch_start = time.time()
+    gene_params = {
+        "max_output_length": args.max_seq_length,
+        "sample": True,
+        "num_runs": args.num_runs,
+        "no_repeat_ngram": 5,
+        "max_batch_size": 12,
+        "no_copy_ngram": 7,
+        "temperature": temperature,
+    }
+
+    # Doing real, sampled generation
+    gens_out = simplifier.generate(paragraphs, **gene_params)
+    unlooped_batch = [
+        {
+            "paragraph": p,
+            "generated": gen["output_text"],
+            "generated_tokenized": gen["output_tokens"],
         }
+        for p, gens in zip(paragraphs, gens_out)
+        for gen in gens
+    ]
+    unlooped_paragraphs = [d["paragraph"] for d in unlooped_batch]
+    generateds = [d["generated"] for d in unlooped_batch]
+    generateds_tokenized = [d["generated_tokenized"] for d in unlooped_batch]
+    timer.tick("sampled_generation")
 
-        # Doing real, sampled generation
-        gens_out = simplifier.generate(paragraphs, **gene_params)
-        unlooped_batch = [
-            {
-                "paragraph": p,
-                "generated": gen["output_text"],
-                "generated_tokenized": gen["output_tokens"],
-            }
-            for p, gens in zip(paragraphs, gens_out)
-            for gen in gens
-        ]
-        unlooped_paragraphs = [d["paragraph"] for d in unlooped_batch]
-        generateds = [d["generated"] for d in unlooped_batch]
-        generateds_tokenized = [d["generated_tokenized"] for d in unlooped_batch]
-        timer.tick("sampled_generation")
+    scorer_returns = scorer.score(unlooped_paragraphs, generateds)
 
-        scorer_returns = scorer.score(unlooped_paragraphs, generateds)
+    # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
+    RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-        # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
-        RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
+    batch_RS_j = RS_j.reshape(args.train_batch_size, N_samples)
+    R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
 
-        batch_RS_j = RS_j.reshape(args.train_batch_size, N_samples)
-        R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
+    timer.tick("all_scores")
+    # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
+    first_loss_term = R_Overline_S - batch_RS_j
+    n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
+        first_loss_term > 0.02
+    ).long().sum().item()
+    print(
+        "[%d samples] %d above avg and %d below avg with a 0.02 margin."
+        % (args.train_batch_size * N_samples, n_diff_pos, n_diff_neg)
+    )
 
-        timer.tick("all_scores")
-        # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
-        first_loss_term = R_Overline_S - batch_RS_j
-        n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
-            first_loss_term > 0.02
-        ).long().sum().item()
-        print(
-            "[%d samples] %d above avg and %d below avg with a 0.02 margin."
-            % (args.train_batch_size * N_samples, n_diff_pos, n_diff_neg)
-        )
+    diversity = len(set(generateds)) / len(generateds)
+    temperature = thermostat.log_diversity(diversity)
+    loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
+    timer.tick("optim")
 
-        diversity = len(set(generateds)) / len(generateds)
-        temperature = thermostat.log_diversity(diversity)
-        loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
-        timer.tick("optim")
-
-        batch_time = time.time() - T_batch_start
-        log_obj = {
-            "loss": loss,
-            "max_scores": torch.max(RS_j),
-            "temperature": temperature,
-            "elem_per_sec": (len(generateds) / (batch_time + 0.001)),
+    batch_time = time.time() - T_batch_start
+    log_obj = {
+        "loss": loss,
+        "max_scores": torch.max(RS_j),
+        "temperature": temperature,
+        "elem_per_sec": (len(generateds) / (batch_time + 0.001)),
+    }
+    log_obj.update(
+        {
+            f"mean_{k}": np.mean(v)
+            for k, v in scorer_returns.items()
+            if "_scores" in k or k in ["fluency_disc_val_f1"]
         }
-        log_obj.update(
-            {
-                f"mean_{k}": np.mean(v)
-                for k, v in scorer_returns.items()
-                if "_scores" in k or k in ["fluency_disc_val_f1"]
-            }
-        )
-        log_obj.update(
-            {
-                k: v
-                for k, v in scorer_returns.items()
-                if "_scores" in k or k in ["fluency_disc_val_f1"]
-            }
-        )
-        wandb.log(log_obj)
+    )
+    log_obj.update(
+        {
+            k: v
+            for k, v in scorer_returns.items()
+            if "_scores" in k or k in ["fluency_disc_val_f1"]
+        }
+    )
+    wandb.log(log_obj)
 
-        if args.timings:
-            timer.report()
+    if args.timings:
+        timer.report()
 
-        # Run the Checkpoint engine
-        current_score = np.mean(scorer_returns["total_scores"])
-        is_best = ckpter.tick(current_score)
-        if is_best:  # Run the inspection dataset through
-            T_last_best = time.time()
+    # Run the Checkpoint engine
+    current_score = np.mean(scorer_returns["total_scores"])
+    is_best = ckpter.tick(current_score)
+    if is_best:  # Run the inspection dataset through
+        T_last_best = time.time()
 
-        # Run the Printing engine
-        printer.tick(paragraphs, generateds, scorer_returns)
+    # Run the Printing engine
+    printer.tick(paragraphs, generateds, scorer_returns)
