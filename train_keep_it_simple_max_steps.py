@@ -247,7 +247,7 @@ T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
 for idx, paragraphs in enumerate(dataloader):
-    if idx == args.max_steps - 1:
+    if idx == args.max_steps:
         break
     T_batch_start = time.time()
     gene_params = {
