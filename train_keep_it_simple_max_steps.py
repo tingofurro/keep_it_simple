@@ -155,23 +155,46 @@ simplifier.reload(args.model_start_file)
 simplifier.eval()
 
 
-def cc_news_collate(inps):
-    batch_paras = []
-    for inp in inps:
-        text = inp["text"]
-        paragraphs = sorted(text.split("\n"), key=lambda p: abs(p.count(" ") - 35))
-        batch_paras.append(paragraphs[0])
-    return batch_paras
+if args.dataset == "cc_news":
 
+    def cc_news_collate(inps):
+        batch_paras = []
+        for inp in inps:
+            text = inp["text"]
+            paragraphs = sorted(text.split("\n"), key=lambda p: abs(p.count(" ") - 35))
+            batch_paras.append(paragraphs[0])
+        return batch_paras
 
-dataset = load_dataset(args.dataset, split="train")
-dataloader = DataLoader(
-    dataset=dataset,
-    batch_size=args.train_batch_size,
-    sampler=RandomSampler(dataset),
-    drop_last=True,
-    collate_fn=cc_news_collate,
-)
+    dataset = load_dataset(args.dataset, split="train")
+
+    dataloader = DataLoader(
+        dataset=dataset,
+        batch_size=args.train_batch_size,
+        sampler=RandomSampler(dataset),
+        drop_last=True,
+        collate_fn=cc_news_collate,
+    )
+elif args.dataset == "newsela":
+
+    def cc_newsela_collate(inps):
+        # TODO: to fix
+        batch_paras = []
+        for inp in inps:
+            text = inp["text"]
+            paragraphs = sorted(text.split("\n"), key=lambda p: abs(p.count(" ") - 35))
+            batch_paras.append(paragraphs[0])
+        return batch_paras
+
+    dataset = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
+    dataset = dataset[dataset["cut"] == "train"]
+
+    dataloader = DataLoader(
+        dataset=dataset,
+        batch_size=args.train_batch_size,
+        sampler=RandomSampler(dataset),
+        drop_last=True,
+        collate_fn=cc_newsela_collate,
+    )
 optimizer = utils_optim.build_optimizer(
     simplifier.model,
     optimizer_name=args.optimizer_name,
