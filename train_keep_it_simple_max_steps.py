@@ -4,6 +4,7 @@ import socket
 import time
 
 import numpy as np
+import pandas as pd
 import wandb
 
 import utils_misc

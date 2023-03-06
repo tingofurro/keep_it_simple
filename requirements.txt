@@ -12,3 +12,6 @@ scikit-learn
 tqdm
 python-Levenshtein
 colorama
+seaborn
+pandas
+matplotlib
