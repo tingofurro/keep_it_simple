@@ -4,12 +4,10 @@ import socket
 import time
 
 import numpy as np
-import pandas as pd
 import wandb
-from datasets import Dataset
 
 import utils_misc
-from utils_dataset import cc_newsela_collate, cc_news_collate
+from utils_dataset import cc_news_collate
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -128,12 +126,6 @@ parser.add_argument(
     "--timings", action="store_true", help="Whether to print out timings for each pass."
 )
 
-# Dataset
-parser.add_argument(
-    "--dataset", choices=["cc_news", "newsela"], type=str, default="cc_news"
-)
-parser.add_argument("--max_steps", type=int, default="40000")
-
 args = parser.parse_args()
 
 args.experiment += "_" + socket.gethostname()
@@ -158,28 +150,14 @@ simplifier = Generator(
 simplifier.reload(args.model_start_file)
 simplifier.eval()
 
-if args.dataset == "cc_news":
-    dataset = load_dataset(args.dataset, split="train")
-
-    dataloader = DataLoader(
-        dataset=dataset,
-        batch_size=args.train_batch_size,
-        sampler=RandomSampler(dataset),
-        drop_last=True,
-        collate_fn=cc_news_collate,
-    )
-elif args.dataset == "newsela":
-    dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
-    dataset_df = dataset_df[dataset_df["cut"] == "train"]
-    dataset = Dataset.from_pandas(dataset_df)
-
-    dataloader = DataLoader(
-        dataset=dataset,
-        batch_size=args.train_batch_size,
-        sampler=RandomSampler(dataset),
-        drop_last=True,
-        collate_fn=cc_newsela_collate,
-    )
+dataset = load_dataset("cc_news")["train"]
+dataloader = DataLoader(
+    dataset=dataset,
+    batch_size=args.train_batch_size,
+    sampler=RandomSampler(dataset),
+    drop_last=True,
+    collate_fn=cc_news_collate,
+)
 optimizer = utils_optim.build_optimizer(
     simplifier.model,
     optimizer_name=args.optimizer_name,
@@ -255,9 +233,7 @@ scorer = utils_scoring.ScorerWrapper(
 T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
-for idx, paragraphs in enumerate(dataloader):
-    if idx == args.max_steps:
-        break
+for ib, paragraphs in enumerate(dataloader):
     T_batch_start = time.time()
     gene_params = {
         "max_output_length": args.max_seq_length,
