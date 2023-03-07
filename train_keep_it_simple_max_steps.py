@@ -8,8 +8,7 @@ import pandas as pd
 import wandb
 
 import utils_misc
-from train_keep_it_simple import cc_news_collate
-from utils_dataset import cc_newsela_collate
+from utils_dataset import cc_newsela_collate, cc_news_collate
 
 freer_gpu = utils_misc.select_freer_gpu()
 
