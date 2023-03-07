@@ -8,6 +8,8 @@ import pandas as pd
 import wandb
 
 import utils_misc
+from train_keep_it_simple import cc_news_collate
+from utils_dataset import cc_newsela_collate
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -127,7 +129,9 @@ parser.add_argument(
 )
 
 # Dataset
-parser.add_argument("--dataset", choices=["cc_news"], type=str, default="cc_news")
+parser.add_argument(
+    "--dataset", choices=["cc_news", "newsela"], type=str, default="cc_news"
+)
 parser.add_argument("--max_steps", type=int, default="40000")
 
 args = parser.parse_args()
@@ -156,15 +160,6 @@ simplifier.eval()
 
 
 if args.dataset == "cc_news":
-
-    def cc_news_collate(inps):
-        batch_paras = []
-        for inp in inps:
-            text = inp["text"]
-            paragraphs = sorted(text.split("\n"), key=lambda p: abs(p.count(" ") - 35))
-            batch_paras.append(paragraphs[0])
-        return batch_paras
-
     dataset = load_dataset(args.dataset, split="train")
 
     dataloader = DataLoader(
@@ -175,16 +170,6 @@ if args.dataset == "cc_news":
         collate_fn=cc_news_collate,
     )
 elif args.dataset == "newsela":
-
-    def cc_newsela_collate(inps):
-        # TODO: to fix
-        batch_paras = []
-        for inp in inps:
-            text = inp["text"]
-            paragraphs = sorted(text.split("\n"), key=lambda p: abs(p.count(" ") - 35))
-            batch_paras.append(paragraphs[0])
-        return batch_paras
-
     dataset = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
     dataset = dataset[dataset["cut"] == "train"]
 
