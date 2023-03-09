@@ -121,7 +121,11 @@ simple_lex_scores = []
 fluency_lm_scores = []
 fluency_disc_scores = []
 for csv_file_name in csv_files_name:
-    if "guardrails" not in csv_file_name and ".gitkeep" not in csv_file_name:
+    if (
+        "guardrails" not in csv_file_name
+        and ".gitkeep" not in csv_file_name
+        and ".png" not in csv_file_name
+    ):
         print("Importing data of experiments: ", csv_file_name)
         data = pd.read_csv(os.path.join(root_dir, csv_file_name))
         subset_data = data[:40000]
@@ -165,6 +169,9 @@ fig.suptitle("All data", fontsize=12)
 plt.tight_layout()
 plt.savefig("all_data.png")
 plt.show()
+
+# sns.histplot([data for data in simple_syn_scores if data > 0.069],         stat="probability", kde=True)
+# plt.show()
 
 # Last 10K data
 coverage_scores = []

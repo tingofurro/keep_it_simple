@@ -3,7 +3,7 @@ import os.path
 import pandas as pd
 import wandb
 
-api = wandb.Api(timeout=30)
+api = wandb.Api(timeout=120)
 
 runs = api.runs("davebulaval/keep_it_simple")
 
