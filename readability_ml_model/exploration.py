@@ -38,7 +38,7 @@ data = []
 
 tcc = TextComplexityComputer(scaler=None, language="en")
 
-for row_metadata in tqdm(metadata[0:10].iterrows(), total=len(metadata)):
+for row_metadata in tqdm(metadata.iterrows(), total=len(metadata)):
     row_metadata_serie = row_metadata[1]
     if row_metadata_serie["language"] == "en":
         Y = row_metadata_serie["grade_level"]
