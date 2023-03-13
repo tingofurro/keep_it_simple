@@ -2,7 +2,7 @@ from wordfreq import zipf_frequency
 import textstat, numpy as np, nltk, torch
 
 
-# we have a target shift. If you go beyond that, you should get penalized, but at a slower rate (right_slope).
+# We have a target shift. If you go beyond that, you should get penalized, but at a slower rate (right_slope).
 def shift_to_score(shift, target_shift, right_slope=0.25):
     if shift <= target_shift:
         score = shift / (target_shift + 0.001)

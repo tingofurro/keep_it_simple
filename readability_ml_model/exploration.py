@@ -34,11 +34,11 @@ prescaled = False
 root = "./"
 
 metadata = pd.read_csv("../datastore/articles_metadata.csv")
-data = pd.DataFrame({})
+data = []
 
 tcc = TextComplexityComputer(scaler=None, language="en")
 
-for row_metadata in tqdm(metadata.iterrows(), total=len(metadata)):
+for row_metadata in tqdm(metadata[0:10].iterrows(), total=len(metadata)):
     row_metadata_serie = row_metadata[1]
     if row_metadata_serie["language"] == "en":
         Y = row_metadata_serie["grade_level"]
@@ -48,7 +48,6 @@ for row_metadata in tqdm(metadata.iterrows(), total=len(metadata)):
             paragraphs = "".join(all_text).split("\n\n")
             for paragraph_idx, paragraph in enumerate(paragraphs):
                 X = tcc.get_metrics_scores(paragraph)
-                data = pd.concat([data, X], ignore_index=True)
+                data.append(X.iloc[0, :].tolist())
 
-data.to_csv("process_newsela_data.csv", index=False)
-print("A")
+pd.DataFrame(data).to_csv("process_newsela_data.csv", index=False)
