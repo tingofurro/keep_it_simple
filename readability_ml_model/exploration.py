@@ -18,10 +18,9 @@
 # }
 #
 # mapping_FCCLC_to_level = {}
+import os
 
 import pandas as pd
-from text_complexity_computer import TextComplexityComputer
-from tqdm import tqdm
 
 seed = 42
 n_iter = 10000
@@ -29,25 +28,6 @@ cv = 3
 verbose = 1
 n_cores = 12
 
-prescaled = False
-
 root = "./"
 
-metadata = pd.read_csv("../datastore/articles_metadata.csv")
-data = []
-
-tcc = TextComplexityComputer(scaler=None, language="en")
-
-for row_metadata in tqdm(metadata.iterrows(), total=len(metadata)):
-    row_metadata_serie = row_metadata[1]
-    if row_metadata_serie["language"] == "en":
-        Y = row_metadata_serie["grade_level"]
-        file_name = row_metadata_serie["filename"]
-        with open(f"../datastore/articles/{file_name}", "r", encoding="utf8") as file:
-            all_text = file.readlines()
-            paragraphs = "".join(all_text).split("\n\n")
-            for paragraph_idx, paragraph in enumerate(paragraphs):
-                X = tcc.get_metrics_scores(paragraph)
-                data.append(X.iloc[0, :].tolist())
-
-pd.DataFrame(data).to_csv("process_newsela_data.csv", index=False)
+all_data = pd.read_csv(os.path.join(root, "datastore", "process_newsela_data.csv"))
