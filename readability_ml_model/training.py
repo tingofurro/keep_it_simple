@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVR
 from sklearn.tree import DecisionTreeRegressor
 
-n_cores = 4
+n_cores = 12
 k_fold = 5
 root = "../"
 
@@ -94,17 +94,17 @@ training_procedure(
 param_grid = {
     "penalty": ["l1", "l2", "elasticnet"],
     "C": np.logspace(-14, 0, c_space),
-    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(
-    model=LogisticRegression(n_jobs=n_cores, max_iter=n_iter, random_state=seed),
+    model=LogisticRegression(
+        n_jobs=n_cores, max_iter=n_iter, random_state=seed, solver="saga"
+    ),
     training_param_grid=param_grid,
 )
 
 param_grid = {
     "alpha": np.logspace(-14, 0, alpha_space),
-    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(
@@ -113,7 +113,6 @@ training_procedure(
 
 param_grid = {
     "alpha": np.logspace(-14, 0, alpha_space),
-    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(
@@ -125,7 +124,6 @@ param_grid = {
     "alpha_2": np.logspace(-14, 0, 10),
     "lambda_1": np.logspace(-14, 0, 10),
     "lambda_2": np.logspace(-14, 0, 10),
-    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(model=BayesianRidge(n_iter=n_iter), training_param_grid=param_grid)
@@ -140,7 +138,6 @@ training_procedure(
 
 param_grid = {
     "epsilon": np.logspace(-14, 0, 250),
-    # "tol": np.logspace(-16, -6, 10),
     "C": np.logspace(-14, 0, c_space),
     "fit_intercept": [True, False],
 }
