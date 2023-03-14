@@ -18,11 +18,14 @@ from sklearn.svm import LinearSVR
 from sklearn.tree import DecisionTreeRegressor
 
 n_cores = 4
+k_fold = 5
 root = "../"
 
 
 def training_procedure(model, training_param_grid, verbose=1):
-    stratified_k_fold = StratifiedKFold(n_splits=10, random_state=seed, shuffle=True)
+    stratified_k_fold = StratifiedKFold(
+        n_splits=k_fold, random_state=seed, shuffle=True
+    )
     model_cv = GridSearchCV(
         model,
         param_grid=training_param_grid,
@@ -61,15 +64,16 @@ def training_procedure(model, training_param_grid, verbose=1):
 
 
 seed = 42
-n_iter = 10000
+n_iter = 25000
 c_space = 500
+alpha_space = 200
 
 all_data = pd.read_csv(os.path.join(root, "datastore", "pre_process_newsela_data.csv"))
 
 X, Y = (all_data.loc[:, all_data.columns != "Y"], all_data["Y"])
 
 # We split dataset into 80-20 train-test sets.
-# Later for training, we will use a 10-fold for the train-val sets.
+# Later for training, we will use a k-fold for the train-val sets.
 X_train, X_test, Y_train, Y_test = train_test_split(
     X, Y, test_size=0.20, random_state=seed, shuffle=True, stratify=Y
 )
@@ -99,7 +103,7 @@ training_procedure(
 )
 
 param_grid = {
-    "alpha": np.logspace(-14, 0, 250),
+    "alpha": np.logspace(-14, 0, alpha_space),
     # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
@@ -108,7 +112,7 @@ training_procedure(
 )
 
 param_grid = {
-    "alpha": np.logspace(-14, 0, 250),
+    "alpha": np.logspace(-14, 0, alpha_space),
     # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
@@ -154,11 +158,9 @@ training_procedure(
 param_grid = {
     "hidden_layer_sizes": [
         x
-        for i in range(3, 6)
+        for i in range(3, 5)
         for x in itertools.product(
             (
-                2,
-                5,
                 10,
                 15,
                 20,
@@ -173,21 +175,10 @@ param_grid = {
                 65,
                 70,
                 75,
-                80,
-                85,
-                90,
-                95,
-                100,
-                105,
-                110,
-                115,
-                120,
             ),
             repeat=i,
         )
     ],
-    "tol": np.logspace(-14, -1, 10),
-    "activation": ["logistic", "relu"],
 }
 training_procedure(
     model=MLPRegressor(
