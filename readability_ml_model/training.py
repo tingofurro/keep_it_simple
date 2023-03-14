@@ -90,7 +90,7 @@ training_procedure(
 param_grid = {
     "penalty": ["l1", "l2", "elasticnet"],
     "C": np.logspace(-14, 0, c_space),
-    "tol": np.logspace(-16, -6, 10),
+    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(
@@ -100,7 +100,7 @@ training_procedure(
 
 param_grid = {
     "alpha": np.logspace(-14, 0, 250),
-    "tol": np.logspace(-16, -6, 10),
+    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(
@@ -109,7 +109,7 @@ training_procedure(
 
 param_grid = {
     "alpha": np.logspace(-14, 0, 250),
-    "tol": np.logspace(-16, -6, 10),
+    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(
@@ -117,11 +117,11 @@ training_procedure(
 )
 
 param_grid = {
-    "alpha_1": np.logspace(-14, 0, 250),
-    "alpha_2": np.logspace(-14, 0, 250),
-    "lambda_1": np.logspace(-14, 0, 250),
-    "lambda_2": np.logspace(-14, 0, 250),
-    "tol": np.logspace(-16, -6, 10),
+    "alpha_1": np.logspace(-14, 0, 10),
+    "alpha_2": np.logspace(-14, 0, 10),
+    "lambda_1": np.logspace(-14, 0, 10),
+    "lambda_2": np.logspace(-14, 0, 10),
+    # "tol": np.logspace(-16, -6, 10),
     "fit_intercept": [True, False],
 }
 training_procedure(model=BayesianRidge(n_iter=n_iter), training_param_grid=param_grid)
@@ -135,8 +135,8 @@ training_procedure(
 )
 
 param_grid = {
-    "epsilon": np.logspace(-14, 0, 500),
-    "tol": np.logspace(-16, -6, 10),
+    "epsilon": np.logspace(-14, 0, 250),
+    # "tol": np.logspace(-16, -6, 10),
     "C": np.logspace(-14, 0, c_space),
     "fit_intercept": [True, False],
 }
@@ -145,7 +145,7 @@ training_procedure(model=LinearSVR(random_state=seed), training_param_grid=param
 param_grid = {
     "max_depth": [32, 64, 128],
     "criterion": ["gini", "entropy"],
-    "n_estimators": np.arange(2, 16384, step=2),
+    "n_estimators": np.arange(2, 4096, step=2),
 }
 training_procedure(
     model=RandomForestRegressor(random_state=seed), training_param_grid=param_grid
