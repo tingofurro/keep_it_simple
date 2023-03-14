@@ -4,7 +4,7 @@ import pandas as pd
 from text_complexity_computer import TextComplexityComputer
 from tqdm import tqdm
 
-root = "./"
+root = "../"
 
 metadata = pd.read_csv(os.path.join(root, "datastore", "articles_metadata.csv"))
 data = []
@@ -23,8 +23,12 @@ for row_metadata in tqdm(metadata.iterrows(), total=len(metadata)):
             )  # We split paragraphs to the double newline character
             for paragraph_idx, paragraph in enumerate(paragraphs):
                 X = tcc.get_metrics_scores(paragraph)
-                data.append(X.iloc[0, :].tolist())
+                data_to_append = [Y]
+                data_to_append.extend(X.iloc[0, :].tolist())
+                data.append(data_to_append)
 
-pd.DataFrame(data).to_csv(
-    os.path.join(root, "datastore", "process_newsela_data.csv"), index=False
+columns = ["Y"]
+columns.extend(X.columns)
+pd.DataFrame(data, columns=columns).to_csv(
+    os.path.join(root, "datastore", "pre_process_newsela_data.csv"), index=False
 )
