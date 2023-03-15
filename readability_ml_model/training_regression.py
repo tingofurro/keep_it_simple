@@ -44,14 +44,14 @@ def training_procedure(model, training_param_grid, verbose=3):
     with open("results_regression.txt", "a") as file:
         print(run_name, file=file)
         print("Mean test R2:", test_r2, file=file)
-        print("Mean test neg MSE", test_mean_new_mse, file=file)
-        print("Best model specs", best_model_specs, file=file)
+        print("Mean test neg MSE:", test_mean_new_mse, file=file)
+        print("Best model specs:", best_model_specs, file=file)
         print("\n", file=file)
 
     print(run_name)
     print("Mean test R2:", test_r2)
-    print("Mean test neg MSE", test_mean_new_mse)
-    print("Best model specs", best_model_specs)
+    print("Mean test neg MSE:", test_mean_new_mse)
+    print("Best model specs:", best_model_specs)
     print("\n")
 
 
@@ -76,7 +76,7 @@ standard_scaler = StandardScaler()
 X_train_normalize = standard_scaler.fit_transform(X_train)
 X_test_normalize = standard_scaler.transform(X_test)
 
-print("Training procedure")
+print("---Training procedure---")
 
 param_grid = {
     "fit_intercept": [True, False],

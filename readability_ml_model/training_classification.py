@@ -8,6 +8,7 @@ from sklearn.linear_model import (
     LogisticRegression,
     SGDClassifier,
 )
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
@@ -27,36 +28,36 @@ def training_procedure(model, training_param_grid, verbose=3):
         model,
         param_grid=training_param_grid,
         cv=stratified_k_fold,
-        scoring=("neg_mean_squared_error", "r2"),
-        refit="neg_mean_squared_error",
+        scoring=("accuracy", "precision", "recall", "f1"),
+        refit="f1",
         verbose=verbose,
         n_jobs=n_cores,
     ).fit(X_train_normalize, Y_train)
-    run_name = type(model_cv.best_estimator_).__name__
 
-    index = np.where(model_cv.cv_results_["rank_test_neg_mean_squared_error"] == 1)[0][
-        0
-    ]
-    with open("results.txt", "a") as file:
+    Y_pred = model_cv.best_estimator_.predict(X_test_normalize)
+    test_f1_score = f1_score(y_true=Y_test, y_pred=Y_pred)
+    test_accuracy = accuracy_score(y_true=Y_test, y_pred=Y_pred)
+    test_precision = precision_score(y_true=Y_test, y_pred=Y_pred)
+    test_recall = recall_score(y_true=Y_test, y_pred=Y_pred)
+
+    run_name = type(model_cv.best_estimator_).__name__
+    best_model_specs = model_cv.best_params_
+
+    with open("results_regression.txt", "a") as file:
         print(run_name, file=file)
-        print("Mean test R2:", model_cv.cv_results_["mean_test_r2"][index], file=file)
-        print(
-            "Mean test neg MSE",
-            model_cv.cv_results_["mean_test_neg_mean_squared_error"][index],
-            file=file,
-        )
-        print("Best model specs", model_cv.best_params_, file=file)
+        print("Mean test F1:", test_f1_score, file=file)
+        print("Mean test accuracy:", test_accuracy, file=file)
+        print("Mean test precision:", test_precision, file=file)
+        print("Mean test recall:", test_recall, file=file)
+        print("Best model specs:", best_model_specs, file=file)
         print("\n", file=file)
+
     print(run_name)
-    print(
-        "Mean test R2:",
-        model_cv.cv_results_["mean_test_r2"][index],
-    )
-    print(
-        "Mean test neg MSE",
-        model_cv.cv_results_["mean_test_neg_mean_squared_error"][index],
-    )
-    print("Best model specs", model_cv.best_params_)
+    print("Mean test F1:", test_f1_score)
+    print("Mean test accuracy:", test_accuracy)
+    print("Mean test precision:", test_precision)
+    print("Mean test recall:", test_recall)
+    print("Best model specs:", best_model_specs)
     print("\n")
 
 
