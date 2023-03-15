@@ -7,8 +7,6 @@ from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.linear_model import (
     LinearRegression,
     Lasso,
-    BayesianRidge,
-    SGDRegressor,
 )
 from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
@@ -43,7 +41,7 @@ def training_procedure(model, training_param_grid, verbose=3):
     run_name = type(model_cv.best_estimator_).__name__
     best_model_specs = model_cv.best_params_
 
-    with open("results.txt", "a") as file:
+    with open("results_regression.txt", "a") as file:
         print(run_name, file=file)
         print("Mean test R2:", test_r2, file=file)
         print("Mean test neg MSE", test_mean_new_mse, file=file)
