@@ -3,13 +3,13 @@ import os
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.linear_model import (
     LinearRegression,
     LogisticRegression,
-    Ridge,
     Lasso,
     BayesianRidge,
+    SGDRegressor,
 )
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPRegressor
@@ -67,10 +67,12 @@ seed = 42
 n_iter = 25000
 c_space = 200
 alpha_space = 150
+lr_space = 100
+logspace_low_bound = -6
 
 all_data = pd.read_csv(os.path.join(root, "datastore", "pre_process_newsela_data.csv"))
 
-X, Y = (all_data.loc[:, all_data.columns != "Y"], all_data["Y"])
+X, Y = (all_data.loc[:, all_data.loc[:, "1persProns":]], all_data["Y"])
 
 # We split dataset into 80-20 train-test sets.
 # Later for training, we will use a k-fold for the train-val sets.
@@ -90,16 +92,17 @@ param_grid = {
 training_procedure(model=LinearRegression(), training_param_grid=param_grid)
 
 param_grid = {
-    "C": np.logspace(-14, 0, c_space),
+    "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
     "fit_intercept": [True, False],
 }
+# SGD with log loss is a Logistic regression
 training_procedure(
-    model=LogisticRegression(max_iter=n_iter, random_state=seed, solver="saga"),
+    model=SGDRegressor(max_iter=n_iter, random_state=seed, loss="log_loss"),
     training_param_grid=param_grid,
 )
 
 param_grid = {
-    "alpha": np.logspace(-14, 0, alpha_space),
+    "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
     "fit_intercept": [True, False],
 }
 training_procedure(
@@ -107,37 +110,58 @@ training_procedure(
 )
 
 param_grid = {
-    "alpha_1": np.logspace(-14, 0, 10),
-    "alpha_2": np.logspace(-14, 0, 10),
-    "lambda_1": np.logspace(-14, 0, 10),
-    "lambda_2": np.logspace(-14, 0, 10),
+    "alpha_1": np.logspace(logspace_low_bound, 0, 5),
+    "alpha_2": np.logspace(logspace_low_bound, 0, 5),
+    "lambda_1": np.logspace(logspace_low_bound, 0, 5),
+    "lambda_2": np.logspace(logspace_low_bound, 0, 5),
     "fit_intercept": [True, False],
 }
 training_procedure(model=BayesianRidge(n_iter=n_iter), training_param_grid=param_grid)
 
 param_grid = {
     "criterion": ["squared_error", "friedman_mse", "absolute_error", "poisson"],
-    "max_depth": [32, 64, 128],
+    "max_depth": [32, 64],
 }
 training_procedure(
     model=DecisionTreeRegressor(random_state=seed), training_param_grid=param_grid
 )
 
 param_grid = {
-    "epsilon": np.logspace(-14, 0, 250),
-    "C": np.logspace(-14, 0, c_space),
+    "epsilon": np.logspace(logspace_low_bound, 0, lr_space),
+    "C": np.logspace(logspace_low_bound, 0, c_space),
     "fit_intercept": [True, False],
 }
 training_procedure(model=LinearSVR(random_state=seed), training_param_grid=param_grid)
 
 param_grid = {
-    "max_depth": [32, 64, 128],
+    "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
+    "fit_intercept": [True, False],
+}
+# SGD with hinge is a SVM
+training_procedure(
+    model=SGDRegressor(max_iter=n_iter, random_state=seed, loss="hinge"),
+    training_param_grid=param_grid,
+)
+
+param_grid = {
+    "max_depth": [32, 64],
     "criterion": ["gini", "entropy"],
-    "n_estimators": np.arange(2, 4096, step=2),
+    "n_estimators": 2 ** np.arange(11)[1:],
 }
 training_procedure(
     model=RandomForestRegressor(random_state=seed), training_param_grid=param_grid
 )
+
+
+param_grid = {
+    "learning_rate": np.logspace(logspace_low_bound, 0, lr_space),
+    "n_estimators": 2 ** np.arange(11)[1:],
+    "loss": ["linear", "square", "exponential"],
+}
+training_procedure(
+    model=AdaBoostRegressor(random_state=seed), training_param_grid=param_grid
+)
+
 
 param_grid = {
     "hidden_layer_sizes": [
