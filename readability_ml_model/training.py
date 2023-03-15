@@ -87,18 +87,14 @@ print("Training procedure")
 param_grid = {
     "fit_intercept": [True, False],
 }
-training_procedure(
-    model=LinearRegression(n_jobs=n_cores), training_param_grid=param_grid
-)
+training_procedure(model=LinearRegression(), training_param_grid=param_grid)
 
 param_grid = {
     "C": np.logspace(-14, 0, c_space),
     "fit_intercept": [True, False],
 }
 training_procedure(
-    model=LogisticRegression(
-        n_jobs=n_cores, max_iter=n_iter, random_state=seed, solver="saga"
-    ),
+    model=LogisticRegression(max_iter=n_iter, random_state=seed, solver="saga"),
     training_param_grid=param_grid,
 )
 
