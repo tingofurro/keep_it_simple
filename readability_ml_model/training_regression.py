@@ -14,10 +14,12 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVR
 from sklearn.tree import DecisionTreeRegressor
+from zca import ZCA
 
 n_cores = 12
 k_fold = 5
 root = "../"
+whitening = False
 
 
 def training_procedure(model, training_param_grid, verbose=3):
@@ -72,9 +74,14 @@ X_train, X_test, Y_train, Y_test = train_test_split(
     X, Y, test_size=0.20, random_state=seed, shuffle=True, stratify=Y
 )
 
-standard_scaler = StandardScaler()
-X_train_normalize = standard_scaler.fit_transform(X_train)
-X_test_normalize = standard_scaler.transform(X_test)
+if whitening:
+    zca_scaler = ZCA()
+    X_train_normalize = zca_scaler.fit_transform(X_train)
+    X_test_normalize = zca_scaler.transform(X_test)
+else:
+    standard_scaler = StandardScaler()
+    X_train_normalize = standard_scaler.fit_transform(X_train)
+    X_test_normalize = standard_scaler.transform(X_test)
 
 print("---Training procedure---")
 
