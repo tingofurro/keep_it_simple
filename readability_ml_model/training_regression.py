@@ -72,7 +72,7 @@ logspace_low_bound = -6
 
 all_data = pd.read_csv(os.path.join(root, "datastore", "pre_process_newsela_data.csv"))
 
-X, Y = (all_data.loc[:, all_data.loc[:, "1persProns":]], all_data["Y"])
+X, Y = (all_data.loc[:, "1persProns":], all_data["Y"])
 
 # We split dataset into 80-20 train-test sets.
 # Later for training, we will use a k-fold for the train-val sets.
