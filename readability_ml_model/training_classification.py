@@ -63,8 +63,8 @@ def training_procedure(model, training_param_grid, verbose=3):
 
 seed = 42
 n_iter = 25000
-c_space = 200
-alpha_space = 150
+c_space = 100
+alpha_space = 100
 lr_space = 100
 logspace_low_bound = -6
 
