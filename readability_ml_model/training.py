@@ -22,7 +22,7 @@ k_fold = 5
 root = "../"
 
 
-def training_procedure(model, training_param_grid, verbose=1):
+def training_procedure(model, training_param_grid, verbose=2):
     stratified_k_fold = StratifiedKFold(
         n_splits=k_fold, random_state=seed, shuffle=True
     )
@@ -92,7 +92,6 @@ training_procedure(
 )
 
 param_grid = {
-    "penalty": ["l1", "l2", "elasticnet"],
     "C": np.logspace(-14, 0, c_space),
     "fit_intercept": [True, False],
 }
@@ -101,14 +100,6 @@ training_procedure(
         n_jobs=n_cores, max_iter=n_iter, random_state=seed, solver="saga"
     ),
     training_param_grid=param_grid,
-)
-
-param_grid = {
-    "alpha": np.logspace(-14, 0, alpha_space),
-    "fit_intercept": [True, False],
-}
-training_procedure(
-    model=Ridge(max_iter=n_iter, random_state=seed), training_param_grid=param_grid
 )
 
 param_grid = {
