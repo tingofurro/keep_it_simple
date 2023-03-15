@@ -92,12 +92,11 @@ param_grid = {
 training_procedure(model=LinearRegression(), training_param_grid=param_grid)
 
 param_grid = {
-    "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
+    "C": np.logspace(logspace_low_bound, 0, alpha_space),
     "fit_intercept": [True, False],
 }
-# SGD with log loss is a Logistic regression
 training_procedure(
-    model=SGDRegressor(max_iter=n_iter, random_state=seed, loss="log_loss"),
+    model=LogisticRegression(max_iter=n_iter, random_state=seed, solver="saga"),
     training_param_grid=param_grid,
 )
 
@@ -152,7 +151,6 @@ training_procedure(
     model=RandomForestRegressor(random_state=seed), training_param_grid=param_grid
 )
 
-
 param_grid = {
     "learning_rate": np.logspace(logspace_low_bound, 0, lr_space),
     "n_estimators": 2 ** np.arange(11)[1:],
@@ -161,7 +159,6 @@ param_grid = {
 training_procedure(
     model=AdaBoostRegressor(random_state=seed), training_param_grid=param_grid
 )
-
 
 param_grid = {
     "hidden_layer_sizes": [
