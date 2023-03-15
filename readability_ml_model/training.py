@@ -22,7 +22,7 @@ k_fold = 5
 root = "../"
 
 
-def training_procedure(model, training_param_grid, verbose=2):
+def training_procedure(model, training_param_grid, verbose=3):
     stratified_k_fold = StratifiedKFold(
         n_splits=k_fold, random_state=seed, shuffle=True
     )
@@ -65,8 +65,8 @@ def training_procedure(model, training_param_grid, verbose=2):
 
 seed = 42
 n_iter = 25000
-c_space = 500
-alpha_space = 200
+c_space = 200
+alpha_space = 150
 
 all_data = pd.read_csv(os.path.join(root, "datastore", "pre_process_newsela_data.csv"))
 
