@@ -6,11 +6,11 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.linear_model import (
     LinearRegression,
-    LogisticRegression,
     Lasso,
     BayesianRidge,
     SGDRegressor,
 )
+from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
@@ -35,31 +35,25 @@ def training_procedure(model, training_param_grid, verbose=3):
         verbose=verbose,
         n_jobs=n_cores,
     ).fit(X_train_normalize, Y_train)
-    run_name = type(model_cv.best_estimator_).__name__
 
-    index = np.where(model_cv.cv_results_["rank_test_neg_mean_squared_error"] == 1)[0][
-        0
-    ]
+    Y_pred = model_cv.best_estimator_.predict(X_test_normalize)
+    test_r2 = r2_score(y_true=Y_test, y_pred=Y_pred)
+    test_mean_new_mse = mean_squared_error(y_true=Y_test, y_pred=Y_pred)
+
+    run_name = type(model_cv.best_estimator_).__name__
+    best_model_specs = model_cv.best_params_
+
     with open("results.txt", "a") as file:
         print(run_name, file=file)
-        print("Mean test R2:", model_cv.cv_results_["mean_test_r2"][index], file=file)
-        print(
-            "Mean test neg MSE",
-            model_cv.cv_results_["mean_test_neg_mean_squared_error"][index],
-            file=file,
-        )
-        print("Best model specs", model_cv.best_params_, file=file)
+        print("Mean test R2:", test_r2, file=file)
+        print("Mean test neg MSE", test_mean_new_mse, file=file)
+        print("Best model specs", best_model_specs, file=file)
         print("\n", file=file)
+
     print(run_name)
-    print(
-        "Mean test R2:",
-        model_cv.cv_results_["mean_test_r2"][index],
-    )
-    print(
-        "Mean test neg MSE",
-        model_cv.cv_results_["mean_test_neg_mean_squared_error"][index],
-    )
-    print("Best model specs", model_cv.best_params_)
+    print("Mean test R2:", test_r2)
+    print("Mean test neg MSE", test_mean_new_mse)
+    print("Best model specs", best_model_specs)
     print("\n")
 
 
@@ -91,14 +85,14 @@ param_grid = {
 }
 training_procedure(model=LinearRegression(), training_param_grid=param_grid)
 
-param_grid = {
-    "C": np.logspace(logspace_low_bound, 0, alpha_space),
-    "fit_intercept": [True, False],
-}
-training_procedure(
-    model=LogisticRegression(max_iter=n_iter, random_state=seed, solver="saga"),
-    training_param_grid=param_grid,
-)
+# param_grid = {
+#     "C": np.logspace(logspace_low_bound, 0, alpha_space),
+#     "fit_intercept": [True, False],
+# }
+# training_procedure(
+#     model=LogisticRegression(max_iter=n_iter, random_state=seed),
+#     training_param_grid=param_grid,
+# )
 
 param_grid = {
     "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
@@ -107,15 +101,6 @@ param_grid = {
 training_procedure(
     model=Lasso(max_iter=n_iter, random_state=seed), training_param_grid=param_grid
 )
-
-param_grid = {
-    "alpha_1": np.logspace(logspace_low_bound, 0, 5),
-    "alpha_2": np.logspace(logspace_low_bound, 0, 5),
-    "lambda_1": np.logspace(logspace_low_bound, 0, 5),
-    "lambda_2": np.logspace(logspace_low_bound, 0, 5),
-    "fit_intercept": [True, False],
-}
-training_procedure(model=BayesianRidge(n_iter=n_iter), training_param_grid=param_grid)
 
 param_grid = {
     "criterion": ["squared_error", "friedman_mse", "absolute_error", "poisson"],
