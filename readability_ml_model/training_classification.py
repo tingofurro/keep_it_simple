@@ -115,7 +115,7 @@ training_procedure(
 )
 
 param_grid = {
-    "criterion": ["squared_error", "friedman_mse"],
+    "criterion": ["gini", "entropy"],
     "max_depth": [32, 64],
 }
 training_procedure(
