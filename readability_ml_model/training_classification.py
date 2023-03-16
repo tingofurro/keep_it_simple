@@ -5,14 +5,12 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.linear_model import (
-    LogisticRegression,
     SGDClassifier,
 )
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 
 n_cores = 12
@@ -35,10 +33,10 @@ def training_procedure(model, training_param_grid, verbose=3):
     ).fit(X_train_normalize, Y_train)
 
     Y_pred = model_cv.best_estimator_.predict(X_test_normalize)
-    test_f1_score = f1_score(y_true=Y_test, y_pred=Y_pred)
+    test_f1_score = f1_score(y_true=Y_test, y_pred=Y_pred, average="macro")
     test_accuracy = accuracy_score(y_true=Y_test, y_pred=Y_pred)
-    test_precision = precision_score(y_true=Y_test, y_pred=Y_pred)
-    test_recall = recall_score(y_true=Y_test, y_pred=Y_pred)
+    test_precision = precision_score(y_true=Y_test, y_pred=Y_pred, average="macro")
+    test_recall = recall_score(y_true=Y_test, y_pred=Y_pred, average="macro")
 
     run_name = type(model_cv.best_estimator_).__name__
     best_model_specs = model_cv.best_params_
