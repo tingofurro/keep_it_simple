@@ -29,9 +29,9 @@ def training_procedure(model, training_param_grid, verbose=3):
         n_splits=k_fold, random_state=seed, shuffle=True
     )
     accuracy = make_scorer(accuracy_score)
-    precision = make_scorer(precision_score, average="macro")
-    recall = make_scorer(recall_score, average="macro")
-    f1 = make_scorer(f1_score, average="macro")
+    precision = make_scorer(precision_score, average="macro", zero_division=0)
+    recall = make_scorer(recall_score, average="macro", zero_division=0)
+    f1 = make_scorer(f1_score, average="macro", zero_division=0)
 
     model_cv = GridSearchCV(
         model,
@@ -49,10 +49,16 @@ def training_procedure(model, training_param_grid, verbose=3):
     ).fit(X_train_normalize, Y_train)
 
     Y_pred = model_cv.best_estimator_.predict(X_test_normalize)
-    test_f1_score = f1_score(y_true=Y_test, y_pred=Y_pred, average="macro")
+    test_f1_score = f1_score(
+        y_true=Y_test, y_pred=Y_pred, average="macro", zero_division=0
+    )
     test_accuracy = accuracy_score(y_true=Y_test, y_pred=Y_pred)
-    test_precision = precision_score(y_true=Y_test, y_pred=Y_pred, average="macro")
-    test_recall = recall_score(y_true=Y_test, y_pred=Y_pred, average="macro")
+    test_precision = precision_score(
+        y_true=Y_test, y_pred=Y_pred, average="macro", zero_division=0
+    )
+    test_recall = recall_score(
+        y_true=Y_test, y_pred=Y_pred, average="macro", zero_division=0
+    )
 
     run_name = type(model_cv.best_estimator_).__name__
     best_model_specs = model_cv.best_params_
