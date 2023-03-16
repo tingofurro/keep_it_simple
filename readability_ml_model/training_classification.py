@@ -7,7 +7,13 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.linear_model import (
     SGDClassifier,
 )
-from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
+from sklearn.metrics import (
+    f1_score,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    make_scorer,
+)
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
@@ -22,11 +28,21 @@ def training_procedure(model, training_param_grid, verbose=3):
     stratified_k_fold = StratifiedKFold(
         n_splits=k_fold, random_state=seed, shuffle=True
     )
+    accuracy = make_scorer(accuracy_score, average="macro")
+    precision = make_scorer(precision_score, average="macro")
+    recall = make_scorer(recall_score, average="macro")
+    f1 = make_scorer(f1_score, average="macro")
+
     model_cv = GridSearchCV(
         model,
         param_grid=training_param_grid,
         cv=stratified_k_fold,
-        scoring=("accuracy", "precision", "recall", "f1"),
+        scoring={
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+        },
         refit="f1",
         verbose=verbose,
         n_jobs=n_cores,
