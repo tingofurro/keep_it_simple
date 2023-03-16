@@ -91,27 +91,12 @@ param_grid = {
 training_procedure(model=LinearRegression(), training_param_grid=param_grid)
 
 param_grid = {
-    "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
-    "fit_intercept": [True, False],
-}
-training_procedure(
-    model=Lasso(max_iter=n_iter, random_state=seed), training_param_grid=param_grid
-)
-
-param_grid = {
     "criterion": ["squared_error", "friedman_mse"],
     "max_depth": [32, 64],
 }
 training_procedure(
     model=DecisionTreeRegressor(random_state=seed), training_param_grid=param_grid
 )
-
-param_grid = {
-    "epsilon": np.logspace(logspace_low_bound, 0, lr_space),
-    "C": np.logspace(logspace_low_bound, 0, c_space),
-    "fit_intercept": [True, False],
-}
-training_procedure(model=LinearSVR(random_state=seed), training_param_grid=param_grid)
 
 param_grid = {
     "max_depth": [32, 64],

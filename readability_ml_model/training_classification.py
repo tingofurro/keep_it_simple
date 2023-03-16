@@ -95,31 +95,12 @@ training_procedure(
 )
 
 param_grid = {
-    "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
-    "fit_intercept": [True, False],
-}
-# Lasso is equivalent to Logistic Regression with l1
-training_procedure(
-    model=SGDClassifier(
-        max_iter=n_iter, random_state=seed, penalty="l1", loss="log_loss"
-    ),
-    training_param_grid=param_grid,
-)
-
-param_grid = {
     "criterion": ["squared_error", "friedman_mse"],
     "max_depth": [32, 64],
 }
 training_procedure(
     model=DecisionTreeClassifier(random_state=seed), training_param_grid=param_grid
 )
-
-param_grid = {
-    "epsilon": np.logspace(logspace_low_bound, 0, lr_space),
-    "C": np.logspace(logspace_low_bound, 0, c_space),
-    "fit_intercept": [True, False],
-}
-training_procedure(model=LinearSVC(random_state=seed), training_param_grid=param_grid)
 
 param_grid = {
     "alpha": np.logspace(logspace_low_bound, 0, alpha_space),
