@@ -19,12 +19,13 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
-n_cores = 12
+n_cores_1 = 12
+n_cores_2 = 6
 k_fold = 5
 root = "../"
 
 
-def training_procedure(model, training_param_grid, verbose=3):
+def training_procedure(model, training_param_grid, verbose=3, n_cores=4):
     stratified_k_fold = StratifiedKFold(
         n_splits=k_fold, random_state=seed, shuffle=True
     )
@@ -112,6 +113,7 @@ param_grid = {
 training_procedure(
     model=SGDClassifier(max_iter=n_iter, random_state=seed, loss="log_loss"),
     training_param_grid=param_grid,
+    n_cores=n_cores_1,
 )
 
 param_grid = {
@@ -119,7 +121,9 @@ param_grid = {
     "max_depth": [32, 64],
 }
 training_procedure(
-    model=DecisionTreeClassifier(random_state=seed), training_param_grid=param_grid
+    model=DecisionTreeClassifier(random_state=seed),
+    training_param_grid=param_grid,
+    n_cores=n_cores_1,
 )
 
 param_grid = {
@@ -130,6 +134,7 @@ param_grid = {
 training_procedure(
     model=SGDClassifier(max_iter=n_iter, random_state=seed, loss="hinge"),
     training_param_grid=param_grid,
+    n_cores=n_cores_2,
 )
 
 param_grid = {
@@ -138,7 +143,9 @@ param_grid = {
     "n_estimators": 2 ** np.arange(11)[1:],
 }
 training_procedure(
-    model=RandomForestClassifier(random_state=seed), training_param_grid=param_grid
+    model=RandomForestClassifier(random_state=seed),
+    training_param_grid=param_grid,
+    n_cores=n_cores_2,
 )
 
 param_grid = {
@@ -147,7 +154,9 @@ param_grid = {
     "loss": ["linear", "square", "exponential"],
 }
 training_procedure(
-    model=AdaBoostClassifier(random_state=seed), training_param_grid=param_grid
+    model=AdaBoostClassifier(random_state=seed),
+    training_param_grid=param_grid,
+    n_cores=n_cores_2,
 )
 
 param_grid = {
@@ -180,4 +189,5 @@ training_procedure(
         random_state=seed, max_iter=n_iter, n_iter_no_change=25, solver="adam"
     ),
     training_param_grid=param_grid,
+    n_cores=n_cores_2,
 )

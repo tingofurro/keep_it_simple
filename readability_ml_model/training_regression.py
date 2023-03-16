@@ -6,23 +6,22 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.linear_model import (
     LinearRegression,
-    Lasso,
 )
 from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVR
 from sklearn.tree import DecisionTreeRegressor
 from zca import ZCA
 
-n_cores = 12
+n_cores_1 = 12
+n_cores_2 = 6
 k_fold = 5
 root = "../"
 whitening = False
 
 
-def training_procedure(model, training_param_grid, verbose=3):
+def training_procedure(model, training_param_grid, verbose=3, n_cores=4):
     stratified_k_fold = StratifiedKFold(
         n_splits=k_fold, random_state=seed, shuffle=True
     )
@@ -88,14 +87,18 @@ print("---Training procedure---")
 param_grid = {
     "fit_intercept": [True, False],
 }
-training_procedure(model=LinearRegression(), training_param_grid=param_grid)
+training_procedure(
+    model=LinearRegression(), training_param_grid=param_grid, n_cores=n_cores_1
+)
 
 param_grid = {
     "criterion": ["squared_error", "friedman_mse"],
     "max_depth": [32, 64],
 }
 training_procedure(
-    model=DecisionTreeRegressor(random_state=seed), training_param_grid=param_grid
+    model=DecisionTreeRegressor(random_state=seed),
+    training_param_grid=param_grid,
+    n_cores=n_cores_1,
 )
 
 param_grid = {
@@ -104,7 +107,9 @@ param_grid = {
     "n_estimators": 2 ** np.arange(11)[1:],
 }
 training_procedure(
-    model=RandomForestRegressor(random_state=seed), training_param_grid=param_grid
+    model=RandomForestRegressor(random_state=seed),
+    training_param_grid=param_grid,
+    n_cores=n_cores_2,
 )
 
 param_grid = {
@@ -113,7 +118,9 @@ param_grid = {
     "loss": ["linear", "square", "exponential"],
 }
 training_procedure(
-    model=AdaBoostRegressor(random_state=seed), training_param_grid=param_grid
+    model=AdaBoostRegressor(random_state=seed),
+    training_param_grid=param_grid,
+    n_cores=n_cores_2,
 )
 
 param_grid = {
