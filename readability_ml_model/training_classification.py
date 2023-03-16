@@ -28,7 +28,7 @@ def training_procedure(model, training_param_grid, verbose=3):
     stratified_k_fold = StratifiedKFold(
         n_splits=k_fold, random_state=seed, shuffle=True
     )
-    accuracy = make_scorer(accuracy_score, average="macro")
+    accuracy = make_scorer(accuracy_score)
     precision = make_scorer(precision_score, average="macro")
     recall = make_scorer(recall_score, average="macro")
     f1 = make_scorer(f1_score, average="macro")
