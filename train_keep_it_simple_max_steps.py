@@ -330,6 +330,16 @@ for idx, paragraphs in enumerate(dataloader):
             if "_scores" in k or k in ["fluency_disc_val_f1"]
         }
     )
+    log_obj.update(
+        {
+            "coverage_original_sentence": scorer_returns["coverage_original_sentence"][
+                0
+            ],
+            "coverage_masked_words_in_sentence": scorer_returns[
+                "coverage_masked_words_in_sentence"
+            ],
+        }
+    )
     wandb.log(log_obj)
 
     if args.timings:

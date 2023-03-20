@@ -1,6 +1,11 @@
-from transformers import AutoTokenizer, AutoModelForMaskedLM
+import os
+
+import nltk
+import numpy as np
+import torch
 from torch.nn.modules.loss import CrossEntropyLoss
-import torch, os, numpy as np, nltk
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
 import utils_masking
 
 
@@ -65,17 +70,35 @@ class CoverageModel:
             for sent in nltk.tokenize.sent_tokenize(document)
             if len(sent) > 0
         ]
-        unmasked, masked, is_masked, mr_eff = self.masking_model.mask(sentences)
-        return unfold(unmasked), unfold(masked), unfold(is_masked), mr_eff
+        (
+            unmasked,
+            masked,
+            is_masked,
+            effective_mask_ratio,
+            masked_words_in_sentences,
+        ) = self.masking_model.mask(sentences)
+        return (
+            unfold(unmasked),
+            unfold(masked),
+            unfold(is_masked),
+            effective_mask_ratio,
+            masked_words_in_sentences,
+        )
 
     def build_io(self, targets, generateds):
         N = len(targets)
 
-        input_ids, labels, is_masked, mr_effs = [], [], [], []
+        input_ids, labels, is_masked, effective_mask_ratios = [], [], [], []
         gen_toks = []
 
         for target, generated in zip(targets, generateds):
-            unmasked, masked, is_ms, mr_eff = self.process_text(target)
+            (
+                unmasked,
+                masked,
+                is_ms,
+                effective_mask_ratio,
+                masked_words_in_sentences,
+            ) = self.process_text(target)
             input_ids.append(masked)
             labels.append(unmasked)
             is_masked.append(is_ms)
@@ -84,7 +107,7 @@ class CoverageModel:
                     self.tokenizer.encode(generated, add_special_tokens=False)
                 )
             )
-            mr_effs.append(mr_eff)
+            effective_mask_ratios.append(effective_mask_ratio)
 
         input_ids = torch.nn.utils.rnn.pad_sequence(
             input_ids, batch_first=True, padding_value=0
@@ -118,10 +141,22 @@ class CoverageModel:
         input_ids = input_ids.to(self.device)
         is_masked = is_masked.to(self.device)
 
-        return input_ids, is_masked, labels, mr_effs
+        return (
+            input_ids,
+            is_masked,
+            labels,
+            effective_mask_ratios,
+            masked_words_in_sentences,
+        )
 
     def train_batch(self, contents, summaries):
-        input_ids, is_masked, labels, mr_effs = self.build_io(contents, summaries)
+        (
+            input_ids,
+            is_masked,
+            labels,
+            effective_mask_ratios,
+            masked_words_in_sentences,
+        ) = self.build_io(contents, summaries)
 
         outputs = self.model(input_ids)
         logits = outputs["logits"]
@@ -158,9 +193,13 @@ class CoverageModel:
     def score_hard(self, bodies, decodeds, **kwargs):
         self.model.eval()
         with torch.no_grad():
-            input_ids_w, is_masked_w, labels_w, mr_effs = self.build_io(
-                bodies, decodeds
-            )
+            (
+                input_ids_w,
+                is_masked_w,
+                labels_w,
+                effective_mask_ratios,
+                masked_words_in_sentences,
+            ) = self.build_io(bodies, decodeds)
 
             outputs_w = self.model(input_ids_w)
             preds_w = torch.argmax(outputs_w["logits"], dim=2)
@@ -177,16 +216,27 @@ class CoverageModel:
             #     accs_wo = torch.sum(preds_wo.eq(labels_wo).long() * is_masked_wo, dim=1).float() / num_masks_wo
         scores = accs_w  # - accs_wo
         scores = scores.tolist()
-        return {"scores": scores, "mr_eff": mr_effs}
+        return {"scores": scores, "mr_eff": masked_words_in_sentences}
 
     def score_soft(self, bodies, decodeds, printing=False, **kwargs):
-        input_ids_w, is_masked_w, labels_w, mr_effs = self.build_io(bodies, decodeds)
+        (
+            input_ids_w,
+            is_masked_w,
+            labels_w,
+            effective_mask_ratios,
+            masked_words_in_sentences,
+        ) = self.build_io(bodies, decodeds)
         scores = self.score_soft_tokenized(input_ids_w, is_masked_w, labels_w)
 
         if printing:
             print("[coverage]", scores)
 
-        return {"scores": scores, "mr_eff": mr_effs}
+        return {
+            "scores": scores,
+            "mr_eff": effective_mask_ratios,
+            "original_sentence": bodies,
+            "masked_words_in_sentence": masked_words_in_sentences,
+        }
 
     def score_soft_tokenized(self, input_ids_w, is_masked_w, labels_w):
         self.model.eval()
