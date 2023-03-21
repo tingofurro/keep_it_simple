@@ -75,14 +75,14 @@ class CoverageModel:
             masked,
             is_masked,
             effective_mask_ratio,
-            masked_words_in_sentences,
+            all_masked_words_in_sentences,
         ) = self.masking_model.mask(sentences)
         return (
             unfold(unmasked),
             unfold(masked),
             unfold(is_masked),
             effective_mask_ratio,
-            masked_words_in_sentences,
+            all_masked_words_in_sentences,
         )
 
     def build_io(self, targets, generateds):
@@ -91,6 +91,7 @@ class CoverageModel:
         input_ids, labels, is_masked, effective_mask_ratios = [], [], [], []
         gen_toks = []
 
+        all_masked_words_in_sentences = []
         for target, generated in zip(targets, generateds):
             (
                 unmasked,
@@ -108,6 +109,7 @@ class CoverageModel:
                 )
             )
             effective_mask_ratios.append(effective_mask_ratio)
+            all_masked_words_in_sentences.append(masked_words_in_sentences)
 
         input_ids = torch.nn.utils.rnn.pad_sequence(
             input_ids, batch_first=True, padding_value=0
@@ -146,7 +148,7 @@ class CoverageModel:
             is_masked,
             labels,
             effective_mask_ratios,
-            masked_words_in_sentences,
+            all_masked_words_in_sentences,
         )
 
     def train_batch(self, contents, summaries):
@@ -155,7 +157,7 @@ class CoverageModel:
             is_masked,
             labels,
             effective_mask_ratios,
-            masked_words_in_sentences,
+            _,
         ) = self.build_io(contents, summaries)
 
         outputs = self.model(input_ids)
@@ -198,7 +200,7 @@ class CoverageModel:
                 is_masked_w,
                 labels_w,
                 effective_mask_ratios,
-                masked_words_in_sentences,
+                all_masked_words_in_sentences,
             ) = self.build_io(bodies, decodeds)
 
             outputs_w = self.model(input_ids_w)
@@ -216,7 +218,7 @@ class CoverageModel:
             #     accs_wo = torch.sum(preds_wo.eq(labels_wo).long() * is_masked_wo, dim=1).float() / num_masks_wo
         scores = accs_w  # - accs_wo
         scores = scores.tolist()
-        return {"scores": scores, "mr_eff": masked_words_in_sentences}
+        return {"scores": scores, "mr_eff": effective_mask_ratios}
 
     def score_soft(self, bodies, decodeds, printing=False, **kwargs):
         (
@@ -224,7 +226,7 @@ class CoverageModel:
             is_masked_w,
             labels_w,
             effective_mask_ratios,
-            masked_words_in_sentences,
+            all_masked_words_in_sentences,
         ) = self.build_io(bodies, decodeds)
         scores = self.score_soft_tokenized(input_ids_w, is_masked_w, labels_w)
 
@@ -235,7 +237,7 @@ class CoverageModel:
             "scores": scores,
             "mr_eff": effective_mask_ratios,
             "original_sentence": bodies,
-            "masked_words_in_sentence": masked_words_in_sentences,
+            "all_masked_words_in_sentences": all_masked_words_in_sentences,
         }
 
     def score_soft_tokenized(self, input_ids_w, is_masked_w, labels_w):

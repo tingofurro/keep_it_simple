@@ -335,9 +335,9 @@ for idx, paragraphs in enumerate(dataloader):
             "coverage_original_sentence": scorer_returns["coverage_original_sentence"][
                 0
             ],
-            "coverage_masked_words_in_sentence": scorer_returns[
-                "coverage_masked_words_in_sentence"
-            ],
+            "coverage_all_masked_words_in_sentence": scorer_returns[
+                "coverage_all_masked_words_in_sentences"
+            ][0],
         }
     )
     wandb.log(log_obj)
