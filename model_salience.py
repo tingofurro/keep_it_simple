@@ -218,7 +218,7 @@ class CoverageModel:
             #     accs_wo = torch.sum(preds_wo.eq(labels_wo).long() * is_masked_wo, dim=1).float() / num_masks_wo
         scores = accs_w  # - accs_wo
         scores = scores.tolist()
-        return {"scores": scores, "mr_eff": effective_mask_ratios}
+        return {"scores": scores, "effective_mask_ratios": effective_mask_ratios}
 
     def score_soft(self, bodies, decodeds, printing=False, **kwargs):
         (
@@ -235,7 +235,7 @@ class CoverageModel:
 
         return {
             "scores": scores,
-            "mr_eff": effective_mask_ratios,
+            "effective_mask_ratios": effective_mask_ratios,
             "original_sentence": bodies,
             "all_masked_words_in_sentences": all_masked_words_in_sentences,
         }
