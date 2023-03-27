@@ -4,21 +4,14 @@ from collections import Counter
 import pandas as pd
 
 data = pd.read_csv(
-    "./results/coverage_masking_analysis_glo-supercomputer_run_coverage_components_steps_values.csv"
+    "./results/coverage_masking_analysis_glo-"
+    "supercomputer_run_coverage_masking_analysis_glo-supercomputer_components_steps_values.csv"
 )
 
 counter = Counter()
 
 for idx, row in data.iterrows():
-    cleaned_texts = (
-        row[1]
-        .strip("[")
-        .strip("]")
-        .replace("'", "")
-        .replace('"', "")
-        .lower()
-        .split(", ")
-    )
+    cleaned_texts = [text.strip() for text in row[1].split(";")]
     counter.update(cleaned_texts)
 
 print(counter)
@@ -39,14 +32,14 @@ print(
     f"Punctuations case {round(sum([ratio for _, ratio in punctuations_ratios]), 2)}%:",
 )
 
-words_junction = ["s", "nt"]
+words_junction = ["'s", "nt"]
 words_junction_ratios = [
     (word, ratio) for word, ratio in ratio_most_common if word in words_junction
 ]
-data = punctuations_ratios
-data.extend(words_junction_ratios)
+data_punctuation = punctuations_ratios
+data_punctuation.extend(words_junction_ratios)
 print(
-    f"Punctuations case and words junction {round(sum([ratio for _, ratio in data]), 2)}%:",
+    f"Punctuations case and words junction {round(sum([ratio for _, ratio in data_punctuation]), 2)}%:",
 )
 
 number_ratios = []
@@ -58,4 +51,28 @@ for word, ratio in ratio_most_common:
         pass
 print(
     f"Number masked {round(sum([ratio for _, ratio in number_ratios]), 2)}%:",
+)
+print(
+    "The mean coverage ratio for this experimentation is:",
+    data["coverage_effective_mask_ratio"].mean(),
+)
+print(
+    "The mean coverage ratio score for the context is:",
+    data["mean_coverage_scores"].mean(),
+)
+
+data = pd.read_csv(
+    "./results/"
+    "coverage_masking_analysis_no_context_glo-supercomputer_run_coverage_masking_"
+    "analysis_no_context_glo-supercomputer_components_steps_values.csv"
+)
+
+print(
+    "The mean coverage ratio for this experimentation (no context) is:",
+    data["coverage_effective_mask_ratio"].mean(),
+)
+
+print(
+    "The mean coverage ratio score for the no context is:",
+    data["mean_coverage_scores"].mean(),
 )
