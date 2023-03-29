@@ -4,10 +4,12 @@ import socket
 import time
 
 import numpy as np
+import pandas as pd
 import wandb
+from datasets import Dataset
 
 import utils_misc
-from utils_dataset import cc_news_collate
+from utils_dataset import cc_newsela_collate, cc_news_collate
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -126,6 +128,12 @@ parser.add_argument(
     "--timings", action="store_true", help="Whether to print out timings for each pass."
 )
 
+# Dataset
+parser.add_argument(
+    "--dataset", choices=["cc_news", "newsela"], type=str, default="cc_news"
+)
+parser.add_argument("--max_steps", type=int, default="40000")
+
 args = parser.parse_args()
 
 args.experiment += "_" + socket.gethostname()
@@ -150,14 +158,28 @@ simplifier = Generator(
 simplifier.reload(args.model_start_file)
 simplifier.eval()
 
-dataset = load_dataset("cc_news")["train"]
-dataloader = DataLoader(
-    dataset=dataset,
-    batch_size=args.train_batch_size,
-    sampler=RandomSampler(dataset),
-    drop_last=True,
-    collate_fn=cc_news_collate,
-)
+if args.dataset == "cc_news":
+    dataset = load_dataset(args.dataset, split="train")
+
+    dataloader = DataLoader(
+        dataset=dataset,
+        batch_size=args.train_batch_size,
+        sampler=RandomSampler(dataset),
+        drop_last=True,
+        collate_fn=cc_news_collate,
+    )
+elif args.dataset == "newsela":
+    dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
+    dataset_df = dataset_df[dataset_df["cut"] == "train"]
+    dataset = Dataset.from_pandas(dataset_df)
+
+    dataloader = DataLoader(
+        dataset=dataset,
+        batch_size=args.train_batch_size,
+        sampler=RandomSampler(dataset),
+        drop_last=True,
+        collate_fn=cc_newsela_collate,
+    )
 optimizer = utils_optim.build_optimizer(
     simplifier.model,
     optimizer_name=args.optimizer_name,
@@ -233,102 +255,104 @@ scorer = utils_scoring.ScorerWrapper(
 T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
-for ib, paragraphs in enumerate(dataloader):
-    T_batch_start = time.time()
-    gene_params = {
-        "max_output_length": args.max_seq_length,
-        "sample": True,
-        "num_runs": args.num_runs,
-        "no_repeat_ngram": 5,
-        "max_batch_size": 12,
-        "no_copy_ngram": 7,
-        "temperature": temperature,
-    }
-
-    # Doing real, sampled generation
-    gens_out = simplifier.generate(paragraphs, **gene_params)
-    unlooped_batch = [
-        {
-            "paragraph": p,
-            "generated": gen["output_text"],
-            "generated_tokenized": gen["output_tokens"],
+for idx, paragraphs in enumerate(dataloader):
+    if idx < args.max_steps:
+        T_batch_start = time.time()
+        gene_params = {
+            "max_output_length": args.max_seq_length,
+            "sample": True,
+            "num_runs": args.num_runs,
+            "no_repeat_ngram": 5,
+            "max_batch_size": 12,
+            "no_copy_ngram": 7,
+            "temperature": temperature,
         }
-        for p, gens in zip(paragraphs, gens_out)
-        for gen in gens
-    ]
-    unlooped_paragraphs = [d["paragraph"] for d in unlooped_batch]
-    generateds = [d["generated"] for d in unlooped_batch]
-    generateds_tokenized = [d["generated_tokenized"] for d in unlooped_batch]
-    timer.tick("sampled_generation")
 
-    scorer_returns = scorer.score(unlooped_paragraphs, generateds)
+        # Doing real, sampled generation
+        gens_out = simplifier.generate(paragraphs, **gene_params)
+        unlooped_batch = [
+            {
+                "paragraph": p,
+                "generated": gen["output_text"],
+                "generated_tokenized": gen["output_tokens"],
+            }
+            for p, gens in zip(paragraphs, gens_out)
+            for gen in gens
+        ]
+        unlooped_paragraphs = [d["paragraph"] for d in unlooped_batch]
+        generateds = [d["generated"] for d in unlooped_batch]
+        generateds_tokenized = [d["generated_tokenized"] for d in unlooped_batch]
+        timer.tick("sampled_generation")
 
-    # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
-    RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
+        scorer_returns = scorer.score(unlooped_paragraphs, generateds)
 
-    batch_RS_j = RS_j.reshape(args.train_batch_size, N_samples)
-    R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
+        # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
+        RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-    timer.tick("all_scores")
-    # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
-    first_loss_term = R_Overline_S - batch_RS_j
-    n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
-        first_loss_term > 0.02
-    ).long().sum().item()
-    print(
-        "[%d samples] %d above avg and %d below avg with a 0.02 margin."
-        % (args.train_batch_size * N_samples, n_diff_pos, n_diff_neg)
-    )
+        batch_RS_j = RS_j.reshape(args.train_batch_size, N_samples)
+        R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
 
-    diversity = len(set(generateds)) / len(generateds)
-    temperature = thermostat.log_diversity(diversity)
-    loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
-    timer.tick("optim")
+        timer.tick("all_scores")
+        # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
+        first_loss_term = R_Overline_S - batch_RS_j
+        n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
+            first_loss_term > 0.02
+        ).long().sum().item()
+        print(
+            "[%d samples] %d above avg and %d below avg with a 0.02 margin."
+            % (args.train_batch_size * N_samples, n_diff_pos, n_diff_neg)
+        )
 
-    batch_time = time.time() - T_batch_start
-    log_obj = {
-        "loss": loss,
-        "max_scores": torch.max(RS_j),
-        "temperature": temperature,
-        "elem_per_sec": (len(generateds) / (batch_time + 0.001)),
-    }
-    log_obj.update(
-        {
-            f"mean_{k}": np.mean(v)
-            for k, v in scorer_returns.items()
-            if "_scores" in k or k in ["fluency_disc_val_f1"]
+        diversity = len(set(generateds)) / len(generateds)
+        temperature = thermostat.log_diversity(diversity)
+        loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
+        timer.tick("optim")
+
+        batch_time = time.time() - T_batch_start
+        log_obj = {
+            "loss": loss,
+            "max_scores": torch.max(RS_j),
+            "temperature": temperature,
+            "elem_per_sec": (len(generateds) / (batch_time + 0.001)),
         }
-    )
-    log_obj.update(
-        {
-            k: v
-            for k, v in scorer_returns.items()
-            if "_scores" in k or k in ["fluency_disc_val_f1"]
-        }
-    )
-    log_obj.update(
-        {
-            "coverage_original_sentence": scorer_returns["coverage_original_sentence"][
-                0
-            ],
-            "coverage_all_masked_words_in_sentence": "; ".join(
-                scorer_returns["coverage_all_masked_words_in_sentences"][0]
-            ),
-            "coverage_effective_mask_ratio": scorer_returns[
-                "coverage_effective_mask_ratios"
-            ][0],
-        }
-    )
-    wandb.log(log_obj)
+        log_obj.update(
+            {
+                f"mean_{k}": np.mean(v)
+                for k, v in scorer_returns.items()
+                if "_scores" in k or k in ["fluency_disc_val_f1"]
+            }
+        )
+        log_obj.update(
+            {
+                k: v
+                for k, v in scorer_returns.items()
+                if "_scores" in k or k in ["fluency_disc_val_f1"]
+            }
+        )
+        log_obj.update(
+            {
+                "coverage_original_sentence": scorer_returns[
+                    "coverage_original_sentence"
+                ][0],
+                "coverage_all_masked_words_in_sentence": "; ".join(
+                    scorer_returns["coverage_all_masked_words_in_sentences"][0]
+                ),
+                "coverage_effective_mask_ratio": scorer_returns[
+                    "coverage_effective_mask_ratios"
+                ][0],
+            }
+        )
+        wandb.log(log_obj)
+        if args.timings:
+            timer.report()
 
-    if args.timings:
-        timer.report()
+        # Run the Checkpoint engine
+        current_score = np.mean(scorer_returns["total_scores"])
+        is_best = ckpter.tick(current_score)
+        if is_best:  # Run the inspection dataset through
+            T_last_best = time.time()
 
-    # Run the Checkpoint engine
-    current_score = np.mean(scorer_returns["total_scores"])
-    is_best = ckpter.tick(current_score)
-    if is_best:  # Run the inspection dataset through
-        T_last_best = time.time()
-
-    # Run the Printing engine
-    printer.tick(paragraphs, generateds, scorer_returns)
+        # Run the Printing engine
+        printer.tick(paragraphs, generateds, scorer_returns)
+    else:
+        break
