@@ -1,5 +1,8 @@
 from collections import Counter
-import nltk, spacy, numpy as np
+
+import nltk
+import numpy as np
+import spacy
 from rake_nltk import Rake
 
 
@@ -79,7 +82,9 @@ class NonStopMasker(Masker):
     def mask(self, sentences):
         unmasked, masked, is_masked = [], [], []
 
+        masked_words_in_sentences = []
         for sentence in sentences:
+            masked_words_in_sentence = []
             ums, ms, ims = [], [], []
             words = nltk.tokenize.word_tokenize(sentence)
             even = 0
@@ -90,13 +95,21 @@ class NonStopMasker(Masker):
                 if w.lower() not in self.stop_ws and even % 2 == 0:
                     ms += [0] * len(toks)
                     ims += [1] * len(toks)
+                    masked_words_in_sentence.append(w)
                 else:
                     ms += toks
                     ims += [0] * len(toks)
+            masked_words_in_sentences.extend(masked_words_in_sentence)
             unmasked.append(ums)
             masked.append(ms)
             is_masked.append(ims)
-        return unmasked, masked, is_masked, self.compute_effective_mask_ratio(is_masked)
+        return (
+            unmasked,
+            masked,
+            is_masked,
+            self.compute_effective_mask_ratio(is_masked),
+            masked_words_in_sentences,
+        )
 
 
 class KeywordMasker(Masker):

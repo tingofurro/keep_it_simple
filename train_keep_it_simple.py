@@ -329,8 +329,20 @@ for idx, paragraphs in enumerate(dataloader):
                 if "_scores" in k or k in ["fluency_disc_val_f1"]
             }
         )
+        log_obj.update(
+            {
+                "coverage_original_sentence": scorer_returns[
+                    "coverage_original_sentence"
+                ][0],
+                "coverage_all_masked_words_in_sentence": "; ".join(
+                    scorer_returns["coverage_all_masked_words_in_sentences"][0]
+                ),
+                "coverage_effective_mask_ratio": scorer_returns[
+                    "coverage_effective_mask_ratios"
+                ][0],
+            }
+        )
         wandb.log(log_obj)
-
         if args.timings:
             timer.report()
 
