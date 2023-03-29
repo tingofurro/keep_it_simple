@@ -4,8 +4,7 @@ from collections import Counter
 import pandas as pd
 
 data = pd.read_csv(
-    "./results/coverage_masking_analysis_glo-"
-    "supercomputer_run_coverage_masking_analysis_glo-supercomputer_components_steps_values.csv"
+    "./results/run_coverage_masking_analysis_k_8_glo-supercomputer_components_steps_values.csv"
 )
 
 counter = Counter()
@@ -57,14 +56,12 @@ print(
     data["coverage_effective_mask_ratio"].mean(),
 )
 print(
-    "The mean coverage ratio score for the context is:",
+    "The mean coverage score for this experimentation is:",
     data["mean_coverage_scores"].mean(),
 )
 
 data = pd.read_csv(
-    "./results/"
-    "coverage_masking_analysis_no_context_glo-supercomputer_run_coverage_masking_"
-    "analysis_no_context_glo-supercomputer_components_steps_values.csv"
+    "./results/run_coverage_masking_analysis_no_context_glo-supercomputer_components_steps_values.csv"
 )
 
 print(
@@ -74,5 +71,19 @@ print(
 
 print(
     "The mean coverage ratio score for the no context is:",
+    data["mean_coverage_scores"].mean(),
+)
+
+data = pd.read_csv(
+    "./results/run_coverage_masking_analysis_no_punctuations_glo-supercomputer_components_steps_values.csv"
+)
+
+print(
+    "The mean coverage ratio for this experimentation (no punctuations) is:",
+    data["coverage_effective_mask_ratio"].mean(),
+)
+
+print(
+    "The mean coverage ratio score for the no punctuations is:",
     data["mean_coverage_scores"].mean(),
 )

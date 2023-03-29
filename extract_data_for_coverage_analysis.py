@@ -28,8 +28,6 @@ for run in runs:
                 "mean_coverage_scores",
             ],
         ).to_csv(
-            os.path.join(
-                "results", f"{run.name}_run_{run.name}_components_steps_values.csv"
-            ),
+            os.path.join("results", f"run_{run.name}_components_steps_values.csv"),
             index=False,
         )
