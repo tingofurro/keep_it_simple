@@ -1,9 +1,9 @@
-import numpy as np
 import time
-import torch
 from datetime import datetime
 
-from torch.cuda import amp
+import numpy as np
+import torch
+import wandb
 from torch.cuda.amp import GradScaler, autocast
 
 import utils_edits
@@ -103,12 +103,14 @@ class RLModelCheckpoint:
     def tick(self, latest_score):
         self.score_history.append(latest_score)
         is_this_best = False
+
+        # Don't do anything for the first 30 minutes
         if (
             time.time() - self.time_start > 30 * 60
             and len(self.score_history) > self.ckpt_lookback
         ):
-            # Don't do anything for the first 30 minutes
             current_score = np.mean(self.score_history[-self.ckpt_lookback :])
+            wandb.log({"score": current_score})
 
             if time.time() - self.time_ckpt > self.ckpt_every:
                 revert_ckpt = self.best_ckpt_score is not None and current_score < min(

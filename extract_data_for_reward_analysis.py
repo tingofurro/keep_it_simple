@@ -3,12 +3,12 @@ import os.path
 import pandas as pd
 import wandb
 
-api = wandb.Api()
+api = wandb.Api(timeout=120)
 
 runs = api.runs("davebulaval/keep_it_simple")
 
 for run in runs:
-    if "graal" in run.name and run.state not in ("failed", "killed"):
+    if "reward_analysis" in run.name:
         pd.DataFrame(
             [
                 row
@@ -19,13 +19,15 @@ for run in runs:
                         "simple_lex_scores",
                         "fluency_lm_scores",
                         "fluency_disc_scores",
+                        "total_scores",
                     ]
                 )
             ]
         ).to_csv(
             os.path.join(
                 "results", f"{run.name}_run_rewards_components_steps_values.csv"
-            )
+            ),
+            index=False,
         )
 
         pd.DataFrame(
@@ -43,5 +45,6 @@ for run in runs:
             os.path.join(
                 "results",
                 f"{run.name}_run_rewards_components_steps_values_guardrails.csv",
-            )
+            ),
+            index=False,
         )
