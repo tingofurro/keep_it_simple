@@ -296,7 +296,7 @@ for idx, paragraphs in enumerate(train_dataloader):
             n=n,
         )
 
-        eval_log = {f"val_{k}": v for k, v in scores.items()}
+        eval_log = {f"val/{k}": v for k, v in scores.items()}
         wandb.log(eval_log)
 
     # We do max_steps steps
@@ -354,34 +354,34 @@ for idx, paragraphs in enumerate(train_dataloader):
 
         batch_time = time.time() - T_batch_start
         log_obj = {
-            "loss": loss,
-            "max_scores": torch.max(RS_j),
-            "temperature": temperature,
-            "elem_per_sec": (len(generateds) / (batch_time + 0.001)),
+            "train/loss": loss,
+            "train/max_scores": torch.max(RS_j),
+            "train/temperature": temperature,
+            "train/elem_per_sec": (len(generateds) / (batch_time + 0.001)),
         }
         log_obj.update(
             {
-                f"mean_{k}": np.mean(v)
+                f"train/mean_{k}": np.mean(v)
                 for k, v in scorer_returns.items()
                 if "_scores" in k or k in ["fluency_disc_val_f1"]
             }
         )
         log_obj.update(
             {
-                k: v
+                f"train/{k}": v
                 for k, v in scorer_returns.items()
                 if "_scores" in k or k in ["fluency_disc_val_f1"]
             }
         )
         log_obj.update(
             {
-                "coverage_original_sentence": scorer_returns[
+                "train/coverage_original_sentence": scorer_returns[
                     "coverage_original_sentence"
                 ][0],
-                "coverage_all_masked_words_in_sentence": "; ".join(
+                "train/coverage_all_masked_words_in_sentence": "; ".join(
                     scorer_returns["coverage_all_masked_words_in_sentences"][0]
                 ),
-                "coverage_effective_mask_ratio": scorer_returns[
+                "train/coverage_effective_mask_ratio": scorer_returns[
                     "coverage_effective_mask_ratios"
                 ][0],
             }
@@ -419,8 +419,8 @@ scores = evaluate_model(
     model=simplifier, coverage_model=coverage_model, dataloader=test_dataloader, n=n
 )
 
-wandb.run.summary["test_average_sari_score"] = scores["average_sari_score"]
-wandb.run.summary["test_average_bleu_score"] = scores["average_bleu_score"]
-wandb.run.summary["test_fkgl_ratio_score"] = scores["fkgl_ratio_score"]
-wandb.run.summary["test_compression_rate_score"] = scores["compression_rate_score"]
-wandb.run.summary["test_coverage_rate_score"] = scores["coverage_rate_score"]
+wandb.run.summary["test/average_sari_score"] = scores["average_sari_score"]
+wandb.run.summary["test/average_bleu_score"] = scores["average_bleu_score"]
+wandb.run.summary["test/fkgl_ratio_score"] = scores["fkgl_ratio_score"]
+wandb.run.summary["test/compression_rate_score"] = scores["compression_rate_score"]
+wandb.run.summary["test/coverage_rate_score"] = scores["coverage_rate_score"]
