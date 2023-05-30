@@ -9,7 +9,8 @@ import wandb
 from datasets import Dataset
 
 import utils_misc
-from utils_dataset import cc_newsela_collate, cc_news_collate
+from evaluation import evaluate_model
+from utils_dataset import cc_newsela_collate, cc_news_collate, cnn_dailymail_collate
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -40,6 +41,8 @@ try:
     use_torch_amp = True
 except ImportError:
     use_torch_amp = False
+
+n = 500
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -130,7 +133,7 @@ parser.add_argument(
 
 # Dataset
 parser.add_argument(
-    "--dataset", choices=["cc_news", "newsela"], type=str, default="cc_news"
+    "--dataset", choices=["cc_news", "cnn_dailymail"], type=str, default="cc_news"
 )
 parser.add_argument("--max_steps", type=int, default="40000")
 
@@ -159,27 +162,53 @@ simplifier.reload(args.model_start_file)
 simplifier.eval()
 
 if args.dataset == "cc_news":
-    dataset = load_dataset(args.dataset, split="train")
+    train_dataset = load_dataset(args.dataset, split="train")
 
-    dataloader = DataLoader(
-        dataset=dataset,
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
         batch_size=args.train_batch_size,
-        sampler=RandomSampler(dataset),
+        sampler=RandomSampler(train_dataset),
         drop_last=True,
         collate_fn=cc_news_collate,
     )
-elif args.dataset == "newsela":
-    dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
-    dataset_df = dataset_df[dataset_df["cut"] == "train"]
-    dataset = Dataset.from_pandas(dataset_df)
+elif args.dataset == "cnn_dailymail":
+    train_dataset = load_dataset(args.dataset, split="train")
 
-    dataloader = DataLoader(
-        dataset=dataset,
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
         batch_size=args.train_batch_size,
-        sampler=RandomSampler(dataset),
+        sampler=RandomSampler(train_dataset),
         drop_last=True,
-        collate_fn=cc_newsela_collate,
+        collate_fn=cnn_dailymail_collate,
     )
+else:
+    raise ValueError(f"Dataset {args.dataset} not supported.")
+
+# The val dataset to eval after each 10K steps + at zero steps
+dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
+val_dataset_df = dataset_df[dataset_df["cut"] == "train"]
+val_dataset = Dataset.from_pandas(val_dataset_df)
+
+val_dataloader = DataLoader(
+    dataset=val_dataset,
+    batch_size=args.train_batch_size,
+    sampler=RandomSampler(val_dataset),
+    drop_last=True,
+    collate_fn=cc_newsela_collate,
+)
+
+# The test dataset use as the final evaluation of the model
+test_dataset_df = dataset_df[dataset_df["cut"] == "dev"]
+test_dataset = Dataset.from_pandas(test_dataset_df)
+test_dataloader = DataLoader(
+    dataset=test_dataset,
+    batch_size=args.train_batch_size,
+    sampler=RandomSampler(test_dataset),
+    drop_last=True,
+    collate_fn=cc_newsela_collate,
+    pin_memory=True,
+)
+
 optimizer = utils_optim.build_optimizer(
     simplifier.model,
     optimizer_name=args.optimizer_name,
@@ -199,15 +228,17 @@ timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
 rl_crit = utils_rl.ReinforceCriterion(simplifier, optimizer, use_apex=use_torch_amp)
 
+coverage_model = CoverageModel(
+    "nostop",
+    model_file=args.coverage_model_path,
+    fp16=True,
+    is_soft=True,
+)
+
 scorers = [
     {
         "name": "coverage",
-        "model": CoverageModel(
-            "nostop",
-            model_file=args.coverage_model_path,
-            fp16=True,
-            is_soft=True,
-        ),
+        "model": coverage_model,
         "sign": 1,
         "weight": 2.0,
     },
@@ -255,7 +286,20 @@ scorer = utils_scoring.ScorerWrapper(
 T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
-for idx, paragraphs in enumerate(dataloader):
+for idx, paragraphs in enumerate(train_dataloader):
+    if idx == 0:
+        print("--- Doing evaluation of the model on the val set ---")
+        scores = evaluate_model(
+            model=simplifier,
+            coverage_model=coverage_model,
+            dataloader=val_dataloader,
+            n=n,
+        )
+
+        eval_log = {f"val_{k}": v for k, v in scores.items()}
+        wandb.log(eval_log)
+
+    # We do max_steps steps
     if idx < args.max_steps:
         T_batch_start = time.time()
         gene_params = {
@@ -354,5 +398,29 @@ for idx, paragraphs in enumerate(dataloader):
 
         # Run the Printing engine
         printer.tick(paragraphs, generateds, scorer_returns)
+
+        if (idx + 1) % 10000 == 0:
+            print("--- Doing evaluation of the model on the val set ---")
+            scores = evaluate_model(
+                model=simplifier,
+                coverage_model=coverage_model,
+                dataloader=val_dataloader,
+                n=n,
+            )
+
+            eval_log = {f"val_{k}": v for k, v in scores.items()}
+            wandb.log(eval_log)
+
     else:
         break
+
+print("--- Doing evaluation of the model on the test set ---")
+scores = evaluate_model(
+    model=simplifier, coverage_model=coverage_model, dataloader=test_dataloader, n=n
+)
+
+wandb.run.summary["test_average_sari_score"] = scores["average_sari_score"]
+wandb.run.summary["test_average_bleu_score"] = scores["average_bleu_score"]
+wandb.run.summary["test_fkgl_ratio_score"] = scores["fkgl_ratio_score"]
+wandb.run.summary["test_compression_rate_score"] = scores["compression_rate_score"]
+wandb.run.summary["test_coverage_rate_score"] = scores["coverage_rate_score"]
