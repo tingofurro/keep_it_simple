@@ -14,9 +14,7 @@ from model_generator import Generator
 from model_salience import CoverageModel
 
 
-def evaluate_model(
-    model: Generator, coverage_model: CoverageModel, dataloader, n: int = 500
-):
+def evaluate_model(model: Generator, coverage_model: CoverageModel, dataloader, n: int = 500):
     with torch.no_grad():
         fkgl_ratio = FKGLRatio(n=n)
         lexile_ratio = LexileRatio(n=n)
@@ -26,7 +24,7 @@ def evaluate_model(
         compression_rates = []
         coverage_rates = []
 
-        for idx, paragraphs in tqdm(enumerate(dataloader)):
+        for idx, paragraphs in tqdm(enumerate(dataloader), total=n):
             if idx < n:
                 gene_params = {
                     "max_output_length": 90,
@@ -39,9 +37,7 @@ def evaluate_model(
                 }
 
                 # We sort the prediction
-                predictions = model.generate(
-                    paragraphs, **gene_params, sort_score=True
-                )[0]
+                predictions = model.generate(paragraphs, **gene_params, sort_score=True)[0]
                 # We take the best prediction to be evaluated
                 best_predictions = predictions[0]
 
@@ -49,14 +45,10 @@ def evaluate_model(
                 # best_predictions: Dict
                 # bes_predictions["output_text"]: str
 
-                sari_score = compute_sari(
-                    references=paragraphs, predictions=[best_predictions["output_text"]]
-                )
+                sari_score = compute_sari(references=paragraphs, predictions=[best_predictions["output_text"]])
                 sari_scores.append(sari_score)
 
-                bleu_score = compute_bleu(
-                    references=paragraphs, predictions=[best_predictions["output_text"]]
-                )
+                bleu_score = compute_bleu(references=paragraphs, predictions=[best_predictions["output_text"]])
                 bleu_scores.append(bleu_score)
 
                 fkgl_ratio.compute_fkgl_scores(
@@ -71,9 +63,7 @@ def evaluate_model(
 
                 # About Coverage:
                 # 0 is the worst, 100 is the best.
-                coverage_scores = coverage_model.score(
-                    bodies=paragraphs, decodeds=[best_predictions["output_text"]]
-                )
+                coverage_scores = coverage_model.score(bodies=paragraphs, decodeds=[best_predictions["output_text"]])
                 coverage_rates.append(round(coverage_scores["scores"][0] * 100, 4))
 
                 lexile_ratio.compute_lexile_scores(
