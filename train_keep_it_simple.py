@@ -1,3 +1,7 @@
+import utils_misc
+
+freer_gpu = utils_misc.select_freer_gpu()
+
 import argparse
 import os
 import socket
@@ -8,11 +12,8 @@ import pandas as pd
 import wandb
 from datasets import Dataset
 
-import utils_misc
 from evaluation import evaluate_model
 from utils_dataset import cc_newsela_collate, cc_news_collate, cnn_dailymail_collate
-
-freer_gpu = utils_misc.select_freer_gpu()
 
 from torch.utils.data import DataLoader, RandomSampler
 
