@@ -135,7 +135,7 @@ parser.add_argument(
 parser.add_argument(
     "--dataset", choices=["cc_news", "cnn_dailymail"], type=str, default="cc_news"
 )
-parser.add_argument("--max_steps", type=int, default="40000")
+parser.add_argument("--max_steps", type=int, default="50000")
 
 args = parser.parse_args()
 
