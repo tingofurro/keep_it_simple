@@ -400,7 +400,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         # Run the Printing engine
         printer.tick(paragraphs, generateds, scorer_returns)
 
-        if (idx + 1) % 10000 == 0:
+        if (idx % 10000) == 0 and idx > 0:
             print("--- Doing evaluation of the model on the val set ---")
             scores = evaluate_model(
                 model=simplifier,
@@ -409,9 +409,8 @@ for idx, paragraphs in enumerate(train_dataloader):
                 n=n,
             )
 
-            eval_log = {f"val_{k}": v for k, v in scores.items()}
-            wandb.log(eval_log)
-
+            eval_log = {f"val/{k}": v for k, v in scores.items()}
+            wandb.log(eval_log, step=idx)
     else:
         break
 
