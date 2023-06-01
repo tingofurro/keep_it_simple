@@ -1,4 +1,5 @@
 import utils_misc
+from tools import bool_parse
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -129,7 +130,10 @@ parser.add_argument(
     help="Save the model and print out an example every x seconds.",
 )
 parser.add_argument(
-    "--timings", action="store_true", help="Whether to print out timings for each pass."
+    "--timings",
+    type=bool_parse,
+    default=True,
+    help="Whether to print out timings for each pass.",
 )
 
 # Dataset
@@ -146,28 +150,31 @@ wandb.init(project="keep_it_simple")
 wandb.config.update(args)
 wandb.run.name = args.experiment
 
+timing = args.timings
 utils_misc.DoublePrint(
     "simplifier_%s_%s.log" % (args.experiment, datetime.now().strftime("%Y_%m_%d")),
-    show_timings=True,
+    show_timings=timing,
 )
 
 N_samples = args.num_runs
+max_seq_length = args.max_seq_length
 simplifier = Generator(
     args.model_card,
     seq2seq=("gpt2" not in args.model_card),
-    max_input_length=args.max_seq_length,
-    max_output_length=args.max_seq_length,
+    max_input_length=max_seq_length,
+    max_output_length=max_seq_length,
     device="cuda",
 )
 simplifier.reload(args.model_start_file)
 simplifier.eval()
 
+train_batch_size = args.train_batch_size
 if args.dataset == "cc_news":
     train_dataset = load_dataset(args.dataset, split="train")
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        batch_size=args.train_batch_size,
+        batch_size=train_batch_size,
         sampler=RandomSampler(train_dataset),
         drop_last=True,
         collate_fn=cc_news_collate,
@@ -177,7 +184,7 @@ elif args.dataset == "cnn_dailymail":
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        batch_size=args.train_batch_size,
+        batch_size=train_batch_size,
         sampler=RandomSampler(train_dataset),
         drop_last=True,
         collate_fn=cnn_dailymail_collate,
@@ -192,7 +199,7 @@ val_dataset = Dataset.from_pandas(val_dataset_df)
 
 val_dataloader = DataLoader(
     dataset=val_dataset,
-    batch_size=args.train_batch_size,
+    batch_size=train_batch_size,
     sampler=RandomSampler(val_dataset),
     drop_last=True,
     collate_fn=cc_newsela_collate,
@@ -203,7 +210,7 @@ test_dataset_df = dataset_df[dataset_df["cut"] == "dev"]
 test_dataset = Dataset.from_pandas(test_dataset_df)
 test_dataloader = DataLoader(
     dataset=test_dataset,
-    batch_size=args.train_batch_size,
+    batch_size=train_batch_size,
     sampler=RandomSampler(test_dataset),
     drop_last=True,
     collate_fn=cc_newsela_collate,
@@ -287,7 +294,19 @@ scorer = utils_scoring.ScorerWrapper(
 T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
+max_steps = args.max_steps
+eval_frequency = 5
 for idx, paragraphs in enumerate(train_dataloader):
+    gene_params = {
+        "max_output_length": max_seq_length,
+        "sample": True,
+        "num_runs": N_samples,
+        "no_repeat_ngram": 5,
+        "max_batch_size": 12,
+        "no_copy_ngram": 7,
+        "temperature": temperature,
+    }
+
     if idx == 0:
         print("--- Doing evaluation of the model on the val set ---")
         scores = evaluate_model(
@@ -298,20 +317,13 @@ for idx, paragraphs in enumerate(train_dataloader):
         )
 
         eval_log = {f"val/{k}": v for k, v in scores.items()}
-        wandb.log(eval_log)
+        wandb.log(
+            eval_log, commit=False
+        )  # commit=false does not increment Steps in log
 
     # We do max_steps steps
-    if idx < args.max_steps:
+    if idx < max_steps:
         T_batch_start = time.time()
-        gene_params = {
-            "max_output_length": args.max_seq_length,
-            "sample": True,
-            "num_runs": args.num_runs,
-            "no_repeat_ngram": 5,
-            "max_batch_size": 12,
-            "no_copy_ngram": 7,
-            "temperature": temperature,
-        }
 
         # Doing real, sampled generation
         gens_out = simplifier.generate(paragraphs, **gene_params)
@@ -334,7 +346,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
         RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-        batch_RS_j = RS_j.reshape(args.train_batch_size, N_samples)
+        batch_RS_j = RS_j.reshape(train_batch_size, N_samples)
         R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
 
         timer.tick("all_scores")
@@ -344,8 +356,8 @@ for idx, paragraphs in enumerate(train_dataloader):
             first_loss_term > 0.02
         ).long().sum().item()
         print(
-            "[%d samples] %d above avg and %d below avg with a 0.02 margin."
-            % (args.train_batch_size * N_samples, n_diff_pos, n_diff_neg)
+            "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
+            % (idx, max_steps, train_batch_size * N_samples, n_diff_pos, n_diff_neg)
         )
 
         diversity = len(set(generateds)) / len(generateds)
@@ -387,8 +399,7 @@ for idx, paragraphs in enumerate(train_dataloader):
                 ][0],
             }
         )
-        wandb.log(log_obj)
-        if args.timings:
+        if timing:
             timer.report()
 
         # Run the Checkpoint engine
@@ -400,7 +411,8 @@ for idx, paragraphs in enumerate(train_dataloader):
         # Run the Printing engine
         printer.tick(paragraphs, generateds, scorer_returns)
 
-        if (idx % 10000) == 0 and idx > 0:
+        # Since each Wandb.log increase the step, we log the training with the eval to better align results
+        if (idx % eval_frequency) == 0 and idx > 0:
             print("--- Doing evaluation of the model on the val set ---")
             scores = evaluate_model(
                 model=simplifier,
@@ -409,8 +421,19 @@ for idx, paragraphs in enumerate(train_dataloader):
                 n=n,
             )
 
-            eval_log = {f"val/{k}": v for k, v in scores.items()}
-            wandb.log(eval_log, step=idx)
+            log_obj.update({f"val/{k}": v for k, v in scores.items()})
+            wandb.log(log_obj)
+
+            if (idx + 1) == 500:
+                # The first 500 steps, we evaluate it each five steps
+                # Then, for the steps between 500 and 10000, we evaluate it each 100 steps
+                # Thus, we raise the eval_frequency
+                eval_frequency = 100
+            elif (idx + 1) == 10000:
+                # Then, for the steps between 10 000 and max_steps, we evaluate it each 10 000 steps
+                eval_frequency = 10000
+        else:
+            wandb.log(log_obj)
     else:
         break
 
@@ -419,8 +442,13 @@ scores = evaluate_model(
     model=simplifier, coverage_model=coverage_model, dataloader=test_dataloader, n=n
 )
 
-wandb.run.summary["test/average_sari_score"] = scores["average_sari_score"]
-wandb.run.summary["test/average_bleu_score"] = scores["average_bleu_score"]
-wandb.run.summary["test/fkgl_ratio_score"] = scores["fkgl_ratio_score"]
-wandb.run.summary["test/compression_rate_score"] = scores["compression_rate_score"]
-wandb.run.summary["test/coverage_rate_score"] = scores["coverage_rate_score"]
+# commit=false does not increment Steps in log
+test_log_obj = {
+    "test/average_sari_score": scores["average_sari_score"],
+    "test/average_bleu_score": scores["average_bleu_score"],
+    "test/fkgl_ratio_score": scores["fkgl_ratio_score"],
+    "test/compression_rate_score": scores["compression_rate_score"],
+    "test/coverage_rate_score": scores["coverage_rate_score"],
+}
+
+wandb.log(test_log_obj, commit=False)

@@ -26,18 +26,18 @@ def evaluate_model(
         compression_rates = []
         coverage_rates = []
 
+        gene_params = {
+            "max_output_length": 90,
+            "sample": True,
+            "num_runs": 8,
+            "no_repeat_ngram": 5,
+            "max_batch_size": 12,
+            "no_copy_ngram": 7,
+            "temperature": 1.0,
+        }
+
         for idx, paragraphs in tqdm(enumerate(dataloader), total=n):
             if idx < n:
-                gene_params = {
-                    "max_output_length": 90,
-                    "sample": True,
-                    "num_runs": 8,
-                    "no_repeat_ngram": 5,
-                    "max_batch_size": 12,
-                    "no_copy_ngram": 7,
-                    "temperature": 1.0,
-                }
-
                 # We sort the prediction
                 predictions = model.generate(
                     paragraphs, **gene_params, sort_score=True
@@ -92,6 +92,6 @@ def evaluate_model(
             "average_sari_score": average_sari_score,
             "average_bleu_score": average_bleu_score,
             "fkgl_ratio_score": fkgl_ratio_score,
-            "compression_rate_score": compression_rate_score,
-            "coverage_rate_score": coverage_rate_score,
+            "average_compression_rate_score": compression_rate_score,
+            "average_coverage_rate_score": coverage_rate_score,
         }
