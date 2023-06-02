@@ -15,3 +15,4 @@ colorama
 seaborn
 pandas
 matplotlib
+evaluate
