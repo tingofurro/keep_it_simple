@@ -16,3 +16,5 @@ seaborn
 pandas
 matplotlib
 evaluate
+sacrebleu
+sacremoses
