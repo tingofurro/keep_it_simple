@@ -413,6 +413,7 @@ for idx, paragraphs in enumerate(train_dataloader):
 
         # Since each Wandb.log increase the step, we log the training with the eval to better align results
         if (idx % eval_frequency) == 0 and idx > 0:
+            torch.cuda.empty_cache()
             print("--- Doing evaluation of the model on the val set ---")
             scores = evaluate_model(
                 model=simplifier,
