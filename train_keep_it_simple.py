@@ -180,7 +180,7 @@ if args.dataset == "cc_news":
         collate_fn=cc_news_collate,
     )
 elif args.dataset == "cnn_dailymail":
-    train_dataset = load_dataset(args.dataset, split="train")
+    train_dataset = load_dataset(args.dataset, "3.0.0", split="train")
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
