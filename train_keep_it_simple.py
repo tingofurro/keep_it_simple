@@ -14,7 +14,13 @@ import wandb
 from datasets import Dataset
 
 from evaluation import evaluate_model
-from utils_dataset import cc_newsela_collate, cc_news_collate, cnn_dailymail_collate
+from utils_dataset import (
+    cc_newsela_collate,
+    cc_news_collate,
+    cnn_dailymail_collate,
+    xsum_collate,
+    CollateFn,
+)
 
 from torch.utils.data import DataLoader, RandomSampler
 
@@ -138,7 +144,10 @@ parser.add_argument(
 
 # Dataset
 parser.add_argument(
-    "--dataset", choices=["cc_news", "cnn_dailymail"], type=str, default="cc_news"
+    "--dataset",
+    choices=["cc_news", "cnn_dailymail", "xsum", "imdb"],
+    type=str,
+    default="cc_news",
 )
 parser.add_argument("--max_steps", type=int, default="50000")
 
@@ -172,25 +181,26 @@ train_batch_size = args.train_batch_size
 if args.dataset == "cc_news":
     train_dataset = load_dataset(args.dataset, split="train")
 
-    train_dataloader = DataLoader(
-        dataset=train_dataset,
-        batch_size=train_batch_size,
-        sampler=RandomSampler(train_dataset),
-        drop_last=True,
-        collate_fn=cc_news_collate,
-    )
+    collate_fn = CollateFn(args.dataset).collate_fn
 elif args.dataset == "cnn_dailymail":
     train_dataset = load_dataset(args.dataset, "3.0.0", split="train")
-
-    train_dataloader = DataLoader(
-        dataset=train_dataset,
-        batch_size=train_batch_size,
-        sampler=RandomSampler(train_dataset),
-        drop_last=True,
-        collate_fn=cnn_dailymail_collate,
-    )
+    collate_fn = CollateFn(args.dataset).collate_fn
+elif args.dataset == "xsum":
+    train_dataset = load_dataset(args.dataset, split="train")
+    collate_fn = CollateFn(args.dataset).collate_fn
+elif args.dataset == "imdb":
+    train_dataset = load_dataset(args.dataset, split="unsupervised")
+    collate_fn = CollateFn(args.dataset).collate_fn
 else:
     raise ValueError(f"Dataset {args.dataset} not supported.")
+
+train_dataloader = DataLoader(
+    dataset=train_dataset,
+    batch_size=train_batch_size,
+    sampler=RandomSampler(train_dataset),
+    drop_last=True,
+    collate_fn=collate_fn,
+)
 
 # The val dataset to eval after each 10K steps + at zero steps
 dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
