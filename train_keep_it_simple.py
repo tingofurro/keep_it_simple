@@ -15,10 +15,6 @@ from datasets import Dataset
 
 from evaluation import evaluate_model
 from utils_dataset import (
-    cc_newsela_collate,
-    cc_news_collate,
-    cnn_dailymail_collate,
-    xsum_collate,
     CollateFn,
 )
 
