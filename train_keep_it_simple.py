@@ -176,7 +176,6 @@ simplifier.eval()
 train_batch_size = args.train_batch_size
 if args.dataset == "cc_news":
     train_dataset = load_dataset(args.dataset, split="train")
-
     collate_fn = CollateFn(args.dataset).collate_fn
 elif args.dataset == "cnn_dailymail":
     train_dataset = load_dataset(args.dataset, "3.0.0", split="train")
@@ -198,6 +197,7 @@ train_dataloader = DataLoader(
     collate_fn=collate_fn,
 )
 
+newsela_collate = CollateFn("newsela").collate_fn
 # The val dataset to eval after each 10K steps + at zero steps
 dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
 val_dataset_df = dataset_df[dataset_df["cut"] == "train"]
@@ -208,7 +208,7 @@ val_dataloader = DataLoader(
     batch_size=train_batch_size,
     sampler=RandomSampler(val_dataset),
     drop_last=True,
-    collate_fn=cc_newsela_collate,
+    collate_fn=newsela_collate,
 )
 
 # The test dataset use as the final evaluation of the model
@@ -219,7 +219,7 @@ test_dataloader = DataLoader(
     batch_size=train_batch_size,
     sampler=RandomSampler(test_dataset),
     drop_last=True,
-    collate_fn=cc_newsela_collate,
+    collate_fn=newsela_collate,
     pin_memory=True,
 )
 
