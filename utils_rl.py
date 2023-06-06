@@ -160,7 +160,8 @@ class RLExamplePrinter:
 
     def tick(self, paragraphs, generateds, scorer_returns):
         if time.time() - self.time_print > self.print_every:
-            IDX = int(np.argmax(scorer_returns["total_scores"]) / self.N_samples)
+            # +1 since we also include the original sentence
+            IDX = int(np.argmax(scorer_returns["total_scores"]) / (self.N_samples + 1))
             if self.print_source:
                 print("----------- ORIGINAL -------------")
                 print(paragraphs[IDX])

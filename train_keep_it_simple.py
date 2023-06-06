@@ -332,8 +332,20 @@ for idx, paragraphs in enumerate(train_dataloader):
     if idx < max_steps:
         T_batch_start = time.time()
 
-        # Doing real, sampled generation
         gens_out = simplifier.generate(paragraphs, **gene_params)
+
+        # We also include the original in the generated as a ground truth
+        # in an attempt to alleviate catastrophic failure.
+        # To do so, we add the sentences as the output text and add the output tokens.
+        gens_out[0].append(
+            {
+                "output_text": paragraphs[0],
+                "output_tokens": simplifier.tokenizer.encode(
+                    paragraphs[0], add_special_tokens=False
+                )[: (simplifier.max_output_length - 1)],
+            }
+        )
+
         unlooped_batch = [
             {
                 "paragraph": p,
@@ -353,8 +365,10 @@ for idx, paragraphs in enumerate(train_dataloader):
         # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
         RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-        batch_RS_j = RS_j.reshape(train_batch_size, N_samples)
-        R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
+        # We also increase by one the N_samples since we added the original sentence
+        batch_RS_j = RS_j.reshape(train_batch_size, N_samples + 1)
+
+        R_Overline_S = batch_RS_j.mean(dim=1)
 
         timer.tick("all_scores")
         # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
@@ -362,9 +376,16 @@ for idx, paragraphs in enumerate(train_dataloader):
         n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
             first_loss_term > 0.02
         ).long().sum().item()
+        # We also increase by one the N_samples since we added the original sentence
         print(
             "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
-            % (idx, max_steps, train_batch_size * N_samples, n_diff_pos, n_diff_neg)
+            % (
+                idx,
+                max_steps,
+                train_batch_size * (N_samples + 1),
+                n_diff_pos,
+                n_diff_neg,
+            )
         )
 
         diversity = len(set(generateds)) / len(generateds)
