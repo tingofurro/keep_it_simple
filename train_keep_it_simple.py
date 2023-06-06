@@ -406,8 +406,6 @@ for idx, paragraphs in enumerate(train_dataloader):
                 ][0],
             }
         )
-        if timing:
-            timer.report()
 
         # Run the Checkpoint engine
         current_score = np.mean(scorer_returns["total_scores"])
