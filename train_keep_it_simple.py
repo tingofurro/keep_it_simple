@@ -302,17 +302,18 @@ temperature = 1.0
 
 max_steps = args.max_steps
 eval_frequency = 5
-for idx, paragraphs in enumerate(train_dataloader):
-    gene_params = {
-        "max_output_length": max_seq_length,
-        "sample": True,
-        "num_runs": N_samples,
-        "no_repeat_ngram": 5,
-        "max_batch_size": 12,
-        "no_copy_ngram": 7,
-        "temperature": temperature,
-    }
 
+gene_params = {
+    "max_output_length": max_seq_length,
+    "sample": True,
+    "num_runs": N_samples,
+    "no_repeat_ngram": 5,
+    "max_batch_size": 12,
+    "no_copy_ngram": 7,
+    "temperature": temperature,
+}
+
+for idx, paragraphs in enumerate(train_dataloader):
     if idx == 0:
         print("--- Doing evaluation of the model on the val set ---")
         scores = evaluate_model(
