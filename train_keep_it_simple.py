@@ -453,8 +453,8 @@ test_log_obj = {
     "test/average_sari_score": scores["average_sari_score"],
     "test/average_bleu_score": scores["average_bleu_score"],
     "test/fkgl_ratio_score": scores["fkgl_ratio_score"],
-    "test/compression_rate_score": scores["compression_rate_score"],
-    "test/coverage_rate_score": scores["coverage_rate_score"],
+    "test/average_compression_rate_score": scores["average_compression_rate_score"],
+    "test/average_coverage_rate_score": scores["average_coverage_rate_score"],
 }
 
 wandb.log(test_log_obj, commit=False)
