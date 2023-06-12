@@ -301,7 +301,7 @@ T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
 max_steps = args.max_steps
-eval_frequency = 5
+eval_frequency = 10
 
 gene_params = {
     "max_output_length": max_seq_length,
