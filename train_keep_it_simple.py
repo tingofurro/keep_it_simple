@@ -46,8 +46,6 @@ try:
 except ImportError:
     use_torch_amp = False
 
-n = 500
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "experiment",
@@ -146,6 +144,7 @@ parser.add_argument(
     default="cc_news",
 )
 parser.add_argument("--max_steps", type=int, default="50000")
+parser.add_argument("--n_eval", type=int, default="500")
 
 args = parser.parse_args()
 
@@ -162,6 +161,7 @@ utils_misc.DoublePrint(
 )
 
 N_samples = args.num_runs
+n_eval = args.n_eval
 max_seq_length = args.max_seq_length
 simplifier = Generator(
     args.model_card,
@@ -320,7 +320,7 @@ for idx, paragraphs in enumerate(train_dataloader):
             model=simplifier,
             coverage_model=coverage_model,
             dataloader=val_dataloader,
-            n=n,
+            n=n_eval,
         )
 
         eval_log = {f"val/{k}": v for k, v in scores.items()}
@@ -424,7 +424,7 @@ for idx, paragraphs in enumerate(train_dataloader):
                 model=simplifier,
                 coverage_model=coverage_model,
                 dataloader=val_dataloader,
-                n=n,
+                n=n_eval,
             )
 
             log_obj.update({f"val/{k}": v for k, v in scores.items()})
@@ -446,7 +446,10 @@ for idx, paragraphs in enumerate(train_dataloader):
 
 print("--- Doing evaluation of the model on the test set ---")
 scores = evaluate_model(
-    model=simplifier, coverage_model=coverage_model, dataloader=test_dataloader, n=n
+    model=simplifier,
+    coverage_model=coverage_model,
+    dataloader=test_dataloader,
+    n=n_eval,
 )
 
 # commit=false does not increment Steps in log
