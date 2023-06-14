@@ -230,19 +230,21 @@ optimizer = utils_optim.build_optimizer(
     learning_rate=args.learning_rate,
 )
 
-output_dir_path = args.ckpt_output_path
+output_dir_path = args.ckpt_output_path + dataset_name
+os.makedirs(output_dir_path, exist_ok=True)
+
 ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
     args.ckpt_lookback,
-    os.path.join(output_dir_path, dataset_name, experiment_name + ".bin"),
+    os.path.join(output_dir_path, experiment_name + ".bin"),
 )
 
 print_every = args.print_every
 printer = utils_rl.RLExamplePrinter(
     print_every,
     N_samples,
-    save_path=os.path.join(output_dir_path, dataset_name, experiment_name + ".txt"),
+    save_path=os.path.join(output_dir_path, experiment_name + ".txt"),
 )
 timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
