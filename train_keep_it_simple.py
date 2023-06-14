@@ -230,7 +230,7 @@ optimizer = utils_optim.build_optimizer(
     learning_rate=args.learning_rate,
 )
 
-output_dir_path = args.ckpt_output_path + dataset_name
+output_dir_path = os.path.join(args.ckpt_output_path, dataset_name)
 os.makedirs(output_dir_path, exist_ok=True)
 
 ckpter = utils_rl.RLModelCheckpoint(
