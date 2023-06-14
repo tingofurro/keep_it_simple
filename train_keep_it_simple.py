@@ -240,11 +240,16 @@ ckpter = utils_rl.RLModelCheckpoint(
     os.path.join(output_dir_path, experiment_name + ".bin"),
 )
 
+save_path = os.path.join(output_dir_path, experiment_name + ".txt")
+if os.path.exists(save_path):
+    # Clean previous log file if it exist
+    os.remove(save_path)
+
 print_every = args.print_every
 printer = utils_rl.RLExamplePrinter(
     print_every,
     N_samples,
-    save_path=os.path.join(output_dir_path, experiment_name + ".txt"),
+    save_path=save_path,
 )
 timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
