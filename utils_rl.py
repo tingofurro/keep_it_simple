@@ -179,16 +179,16 @@ class RLExamplePrinter:
                 )
 
                 log_message += (
-                    "\n[",
-                    "; ".join(
+                    "\n["
+                    + "; ".join(
                         [
                             "%s: %.4f"
                             % (k.replace("_scores", ""), scorer_returns[k][gen_i])
                             for k in scorer_returns
                             if ("_score" in k or "pred_level" in k)
                         ]
-                    ),
-                    "]\n---\n",
+                    )
+                    + "]\n---\n"
                 )
 
             self.time_print = time.time()
@@ -196,5 +196,5 @@ class RLExamplePrinter:
 
             print(log_message)
 
-            with open(save_path, "a") as file:
+            with open(self.save_path, "a") as file:
                 file.writelines(log_message)
