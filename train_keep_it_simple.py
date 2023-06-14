@@ -126,7 +126,7 @@ parser.add_argument(
 parser.add_argument(
     "--print_every",
     type=int,
-    default=150,
+    default=10,
     help="Save the model and print out an example every x seconds.",
 )
 parser.add_argument(
@@ -229,14 +229,19 @@ optimizer = utils_optim.build_optimizer(
     learning_rate=args.learning_rate,
 )
 
+output_dir_path = args.ckpt_output_path
 ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
     args.ckpt_lookback,
-    os.path.join(args.ckpt_output_path, args.experiment + ".bin"),
+    os.path.join(output_dir_path, args.experiment + ".bin"),
 )
+
+print_every = args.print_every
 printer = utils_rl.RLExamplePrinter(
-    args.print_every, N_samples, print_source=False, print_edit=True
+    print_every,
+    N_samples,
+    save_path=os.path.join(output_dir_path, args.experiment + ".txt"),
 )
 timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
@@ -437,6 +442,7 @@ for idx, paragraphs in enumerate(train_dataloader):
             # Then, for the steps between 100 and 1000, we evaluate it each 100 steps
             # Thus, we raise the eval_frequency
             eval_frequency = 100
+            print_every = 150
         elif idx == 1000:
             # Then, for the steps between 1000 and 10 000, we evaluate it each 1000 steps
             eval_frequency = 1000

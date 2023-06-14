@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 
@@ -151,46 +152,49 @@ class RLModelCheckpoint:
 
 
 class RLExamplePrinter:
-    def __init__(self, print_every, N_samples, print_source=False, print_edit=False):
+    def __init__(
+        self,
+        print_every,
+        N_samples,
+        save_path: str,
+    ):
         self.print_every = print_every
         self.N_samples = N_samples
-        self.print_source = print_source
-        self.print_edit = print_edit
+        self.save_path = save_path
         self.time_print = time.time()
 
     def tick(self, paragraphs, generateds, scorer_returns):
         if time.time() - self.time_print > self.print_every:
             IDX = int(np.argmax(scorer_returns["total_scores"]) / self.N_samples)
-            if self.print_source:
-                print("----------- ORIGINAL -------------")
-                print(paragraphs[IDX])
 
-            print("----------- GENERATED OPTIONS ---------")
+            log_message = "----------- GENERATED OPTIONS ---------\n"
             gen_is = sorted(
                 range(self.N_samples * IDX, self.N_samples * (IDX + 1)),
                 key=lambda gen_i: -scorer_returns["total_scores"][gen_i],
             )  # Ordered from best scoring to smallest scoring
 
             for gen_i in gen_is:
-                if self.print_edit:
-                    print(
-                        utils_edits.show_diff_word(paragraphs[IDX], generateds[gen_i])
-                    )
-                else:
-                    print(generateds[gen_i])
-                print(
-                    "["
-                    + "; ".join(
+                log_message += utils_edits.show_diff_word(
+                    paragraphs[IDX], generateds[gen_i]
+                )
+
+                log_message += (
+                    "\n[",
+                    "; ".join(
                         [
                             "%s: %.4f"
                             % (k.replace("_scores", ""), scorer_returns[k][gen_i])
                             for k in scorer_returns
                             if ("_score" in k or "pred_level" in k)
                         ]
-                    )
-                    + "]"
+                    ),
+                    "]\n---\n",
                 )
-                print("---")
 
             self.time_print = time.time()
-            print("==========================================")
+            log_message += "\n=========================================="
+
+            print(log_message)
+
+            with open(save_path, "a") as file:
+                file.writelines(log_message)
