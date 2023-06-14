@@ -432,11 +432,14 @@ for idx, paragraphs in enumerate(train_dataloader):
         else:
             wandb.log(log_obj)
 
-        if idx == 500:
-            # The first 500 steps, we evaluate it each five steps
-            # Then, for the steps between 500 and 10000, we evaluate it each 100 steps
+        if idx == 100:
+            # The first 100 steps, we evaluate it each 10 steps
+            # Then, for the steps between 100 and 1000, we evaluate it each 100 steps
             # Thus, we raise the eval_frequency
             eval_frequency = 100
+        elif idx == 1000:
+            # Then, for the steps between 1000 and 10 000, we evaluate it each 1000 steps
+            eval_frequency = 1000
         elif idx == 10000:
             # Then, for the steps between 10 000 and max_steps, we evaluate it each 10 000 steps
             eval_frequency = 10000
