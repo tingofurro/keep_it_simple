@@ -192,9 +192,9 @@ class RLExamplePrinter:
                 )
 
             self.time_print = time.time()
-            log_message += "\n=========================================="
+            log_message += "\n==========================================\n"
 
             print(log_message)
 
-            with open(self.save_path, "a") as file:
+            with open(self.save_path, "a", encoding="utf-8") as file:
                 file.writelines(log_message)

@@ -148,15 +148,15 @@ parser.add_argument("--n_eval", type=int, default="500")
 
 args = parser.parse_args()
 
-args.experiment += "_" + socket.gethostname()
+experiment_name = args.experiment + "_" + socket.gethostname()
 
 wandb.init(project="keep_it_simple")
 wandb.config.update(args)
-wandb.run.name = args.experiment
+wandb.run.name = experiment_name
 
 timing = args.timings
 utils_misc.DoublePrint(
-    "simplifier_%s_%s.log" % (args.experiment, datetime.now().strftime("%Y_%m_%d")),
+    "simplifier_%s_%s.log" % (experiment_name, datetime.now().strftime("%Y_%m_%d")),
     show_timings=timing,
 )
 
@@ -174,20 +174,21 @@ simplifier.reload(args.model_start_file)
 simplifier.eval()
 
 train_batch_size = args.train_batch_size
-if args.dataset == "cc_news":
-    train_dataset = load_dataset(args.dataset, split="train")
-    collate_fn = CollateFn(args.dataset).collate_fn
-elif args.dataset == "cnn_dailymail":
-    train_dataset = load_dataset(args.dataset, "3.0.0", split="train")
-    collate_fn = CollateFn(args.dataset).collate_fn
-elif args.dataset == "xsum":
-    train_dataset = load_dataset(args.dataset, split="train")
-    collate_fn = CollateFn(args.dataset).collate_fn
-elif args.dataset == "imdb":
-    train_dataset = load_dataset(args.dataset, split="unsupervised")
-    collate_fn = CollateFn(args.dataset).collate_fn
+dataset_name = args.dataset
+if dataset_name == "cc_news":
+    train_dataset = load_dataset(dataset_name, split="train")
+    collate_fn = CollateFn(dataset_name).collate_fn
+elif dataset_name == "cnn_dailymail":
+    train_dataset = load_dataset(dataset_name, "3.0.0", split="train")
+    collate_fn = CollateFn(dataset_name).collate_fn
+elif dataset_name == "xsum":
+    train_dataset = load_dataset(dataset_name, split="train")
+    collate_fn = CollateFn(dataset_name).collate_fn
+elif dataset_name == "imdb":
+    train_dataset = load_dataset(dataset_name, split="unsupervised")
+    collate_fn = CollateFn(dataset_name).collate_fn
 else:
-    raise ValueError(f"Dataset {args.dataset} not supported.")
+    raise ValueError(f"Dataset {dataset_name} not supported.")
 
 train_dataloader = DataLoader(
     dataset=train_dataset,
@@ -234,14 +235,14 @@ ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
     args.ckpt_lookback,
-    os.path.join(output_dir_path, args.experiment + ".bin"),
+    os.path.join(output_dir_path, dataset_name, experiment_name + ".bin"),
 )
 
 print_every = args.print_every
 printer = utils_rl.RLExamplePrinter(
     print_every,
     N_samples,
-    save_path=os.path.join(output_dir_path, args.experiment + ".txt"),
+    save_path=os.path.join(output_dir_path, dataset_name, experiment_name + ".txt"),
 )
 timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
