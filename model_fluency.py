@@ -233,7 +233,7 @@ class TextDiscriminator:
 
         self.train_from_dataset(texts, labels, n_epochs=3)
 
-    def retrain_files(self, data_files, old_format=False):
+    def retrain_files(self, data_files):
         sentences, labels = [], []
         sentence_set = set([])
         for data_file in data_files:
