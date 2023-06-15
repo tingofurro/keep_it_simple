@@ -112,12 +112,17 @@ def compute_bleu(references: List, predictions: List) -> float:
 def compute_compression_rate(references: List, predictions: List) -> float:
     """
     About compression rate:
-    - We compute it as 1 minus the number of words (tokenize using NLTK word tokenizer) of the simplified sentence over
-        the number of words in the original sentence.
+    - We compute it as the number of whitespace of the simplified sentence over
+        the number of whitespace in the original sentence.
     - https://en.wikipedia.org/wiki/Data_compression_ratio
-    - todo: validate with authors how they did it -> email sent March 29th 2023
-    """
-    number_of_words_references = len(nltk.tokenize.word_tokenize(references[0]))
-    number_of_words_predictions = len(nltk.tokenize.word_tokenize(predictions[0]))
+    Note: Original authors use the number of whitespace as the counter of tokens separator. See here
+    https://github.com/tingofurro/keep_it_simple/blob/bfca57d6ebea2a8d51cd07c347641f4fc3ff0a6e/model_guardrails.py#L9
 
-    return 1 - number_of_words_predictions / number_of_words_references
+    """
+    if references[0].count(" ") == 0:
+        return 0.0
+
+    number_of_whitespace_references = references[0].count(" ")
+    number_of_whitespace_predictions = predictions[0].count(" ")
+
+    return number_of_whitespace_predictions / number_of_whitespace_references
