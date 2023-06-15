@@ -168,8 +168,6 @@ utils_misc.DoublePrint(
 
 include_original = args.include_original
 n_samples = args.num_runs
-if include_original:
-    n_samples = n_samples + 1
 
 n_eval = args.n_eval
 max_seq_length = args.max_seq_length
@@ -336,6 +334,12 @@ gene_params = {
     "temperature": temperature,
 }
 
+if include_original:
+    # We also increase by one the n_samples since we will add the original sentence
+    batch_sample_size = n_samples + 1
+else:
+    batch_sample_size = n_samples
+
 for idx, paragraphs in enumerate(train_dataloader):
     if idx == 0:
         print("--- Doing evaluation of the model on the val set ---")
@@ -389,8 +393,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
         RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-        # We also increase by one the n_samples since we added the original sentence
-        batch_RS_j = RS_j.reshape(train_batch_size, n_samples)
+        batch_RS_j = RS_j.reshape(train_batch_size, batch_sample_size)
 
         R_Overline_S = batch_RS_j.mean(dim=1)
 
@@ -406,7 +409,7 @@ for idx, paragraphs in enumerate(train_dataloader):
             % (
                 idx,
                 max_steps,
-                train_batch_size * n_samples,
+                train_batch_size * batch_sample_size,
                 n_diff_pos,
                 n_diff_neg,
             )
@@ -459,7 +462,9 @@ for idx, paragraphs in enumerate(train_dataloader):
             T_last_best = time.time()
 
         # Run the Printing engine
-        printer.tick(paragraphs, generateds, scorer_returns)
+        printer.tick(
+            paragraphs, generateds, scorer_returns, include_original=include_original
+        )
 
         # Since each Wandb.log increase the step, we log the training with the eval to better align results
         if (idx % eval_frequency) == 0 and idx > 0:

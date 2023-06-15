@@ -177,7 +177,7 @@ class RLExamplePrinter:
 
             log_message = "----------- GENERATED OPTIONS ---------\n"
             gen_is = sorted(
-                range(self.n_samples * IDX, self.n_samples * (IDX + 1)),
+                range(n_samples * IDX, n_samples * (IDX + 1)),
                 key=lambda gen_i: -scorer_returns["total_scores"][gen_i],
             )  # Ordered from best scoring to the smallest scoring
 
