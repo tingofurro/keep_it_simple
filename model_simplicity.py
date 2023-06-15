@@ -37,7 +37,7 @@ class SimplicityLexicalScore:
             return False
         return True
 
-    def vocab_shift_score(self, txt1, txt2, printing=False):
+    def vocab_shift_score(self, txt1, txt2):
         words1 = nltk.tokenize.word_tokenize(txt1)
         words2 = nltk.tokenize.word_tokenize(txt2)
         words1 = set([w.lower() for w in words1 if self.is_good_word(w)])
@@ -77,16 +77,6 @@ class SimplicityLexicalScore:
                     ]
                 ]
             )
-            if printing:
-                print("Desired # word swaps: %d" % (target_n_words))
-                print(
-                    "[Avg Zipf: %.3f] Added words:" % (added_avg_zipfs),
-                    added_words_zipfs,
-                )
-                print(
-                    "[Avg Zipf: %.3f] Removed words:" % (removed_avg_zipfs),
-                    removed_words_zipfs,
-                )
 
             vocab_shift = (
                 (added_avg_zipfs - removed_avg_zipfs)
@@ -96,17 +86,12 @@ class SimplicityLexicalScore:
 
         return vocab_shift, len(added_words), len(removed_words)
 
-    def score(self, sources, generateds, partial=False, printing=False, **kwargs):
+    def score(self, sources, generateds):
         scores = []
         vshifts = []
         n_adds, n_dels = [], []
         for source, generated in zip(sources, generateds):
-            if partial:
-                source = " ".join(source.split(" ")[: generated.count(" ")])
-
-            vshift, n_add, n_del = self.vocab_shift_score(
-                source, generated, printing=printing
-            )
+            vshift, n_add, n_del = self.vocab_shift_score(source, generated)
             score = shift_to_score(vshift, self.target_shift)
 
             vshifts.append(vshift)
@@ -117,8 +102,6 @@ class SimplicityLexicalScore:
         scores = torch.FloatTensor(scores)
         scores = (0.3 + torch.clamp(scores, 0.05, 1.0) * 0.7).tolist()
 
-        if printing:
-            print("[vshift]", scores)
         return {
             "scores": scores,
             "n_w_adds": n_adds,
@@ -147,13 +130,10 @@ class SimplicitySyntacticScore:
         score2 = textstat.flesch_kincaid_grade(txt2)
         return score1, score2
 
-    def score(self, sources, generateds, partial=False, printing=False, **kwargs):
+    def score(self, sources, generateds):
         scores = []
         rshifts, rsources, rtargets = [], [], []
         for source, generated in zip(sources, generateds):
-            if partial:
-                source = " ".join(source.split(" ")[: generated.count(" ")])
-
             rsource, rtarget = self.readability_shift_score(source, generated)
             rshift = rsource - rtarget
             target_shift = self.rsource2target_shift(rsource)
@@ -167,8 +147,6 @@ class SimplicitySyntacticScore:
         scores = torch.FloatTensor(scores)
         scores = (0.05 + torch.clamp(scores, 0.02, 1.0) * 0.95).tolist()
 
-        if printing:
-            print("[rshift]", scores)
         return {
             "scores": scores,
             "rshifts": rshifts,

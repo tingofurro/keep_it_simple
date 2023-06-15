@@ -35,10 +35,8 @@ class ScorerWrapper:
         self,
         inputs,
         generateds,
-        partial=False,
         printing=False,
         timings=False,
-        extras={},
         progress=False,
     ):
         assert len(inputs) == len(generateds), "Input and output lengths don't match"
@@ -73,12 +71,7 @@ class ScorerWrapper:
             batch_gens = [d["gen"] for d in batch_todo]
 
             batch_scores, timings_out = self.score_func(
-                self.scorers,
-                batch_inputs,
-                batch_gens,
-                partial=partial,
-                printing=printing,
-                extras=extras,
+                self.scorers, batch_inputs, batch_gens
             )
 
             for k, out in batch_scores.items():
@@ -99,21 +92,17 @@ class ScorerWrapper:
             print("[total]", all_outputs["total_scores"])
         return all_outputs
 
-    def __call__(self, inputs, generateds, **kwargs):
-        return self.score(inputs, generateds, **kwargs)
+    def __call__(self, inputs, generateds):
+        return self.score(inputs, generateds)
 
 
-def sum_score(
-    scorers, paragraphs, generateds, partial=False, printing=False, extras={}
-):
+def sum_score(scorers, paragraphs, generateds):
     total_scores = np.zeros((len(paragraphs)))
     scorer_returns, timings = {}, {}
     T = time.time()
 
     for scorer in scorers:
-        scores = scorer["model"].score(
-            paragraphs, generateds, partial=partial, printing=printing, **extras
-        )
+        scores = scorer["model"].score(paragraphs, generateds)
         weight = scorer.get("weight", 1.0)
         total_scores += scorer["sign"] * weight * np.array(scores["scores"])
 
@@ -125,17 +114,13 @@ def sum_score(
     return scorer_returns, timings
 
 
-def product_score(
-    scorers, paragraphs, generateds, partial=False, printing=False, extras={}
-):
+def product_score(scorers, paragraphs, generateds):
     total_scores = np.ones((len(paragraphs)))
     scorer_returns, timings = {}, {}
     T = time.time()
 
     for scorer in scorers:
-        scores = scorer["model"].score(
-            paragraphs, generateds, partial=partial, printing=printing, **extras
-        )
+        scores = scorer["model"].score(paragraphs, generateds)
         if scorer["sign"] == 1:
             total_scores *= np.array(scores["scores"])
         else:  # It's a binary penalty
@@ -149,17 +134,13 @@ def product_score(
     return scorer_returns, timings
 
 
-def logsum_score(
-    scorers, paragraphs, generateds, partial=False, printing=False, extras={}
-):
+def logsum_score(scorers, paragraphs, generateds):
     total_scores = np.zeros((len(paragraphs)))
     scorer_returns, timings = {}, {}
     T = time.time()
 
     for scorer in scorers:
-        scores = scorer["model"].score(
-            paragraphs, generateds, partial=partial, printing=printing, **extras
-        )
+        scores = scorer["model"].score(paragraphs, generateds)
         weight = scorer.get("weight", 1.0)
         scores["scores"] = np.clip(scores["scores"], 0.0001, 0.9999)
         if scorer["sign"] == 1:

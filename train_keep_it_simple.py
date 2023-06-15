@@ -126,7 +126,7 @@ parser.add_argument(
 parser.add_argument(
     "--print_every",
     type=int,
-    default=10,
+    default=150,
     help="Save the model and print out an example every x seconds.",
 )
 parser.add_argument(
@@ -288,19 +288,19 @@ scorers = [
         "sign": 1,
     },
     {
-        "name": "gr_repeat",
+        "name": "gr_repeat_penalty",
         "model": RepeatNGramPenalty(gram=3),
         "sign": -1,
         "weight": 2.0,
     },
     {
-        "name": "gr_brevity",
+        "name": "gr_brevity_penalty",
         "model": RelativeBrevityPenalizer(min_ratio=0.6, max_ratio=1.3),
         "sign": -1,
         "weight": 2.0,
     },
     {
-        "name": "gr_hallucination",
+        "name": "gr_hallucination_penalty",
         "model": NERInaccuracyPenalty(),
         "sign": -1,
         "weight": 2.0,

@@ -175,12 +175,12 @@ class CoverageModel:
 
         return loss, accs.mean().item()
 
-    def score(self, bodies, decodeds, **kwargs):
+    def score(self, bodies, decodeds):
         score_func = self.score_soft if self.is_soft else self.score_hard
-        unnorm_scores = score_func(bodies, decodeds, **kwargs)
+        unnorm_scores = score_func(bodies, decodeds)
 
         if self.normalize:
-            empty_scores = score_func(bodies, [""] * len(bodies), **kwargs)
+            empty_scores = score_func(bodies, [""] * len(bodies))
             zero_scores = np.array(empty_scores["scores"])
 
             norm_scores = {k: v for k, v in unnorm_scores.items()}
@@ -192,7 +192,7 @@ class CoverageModel:
         else:
             return unnorm_scores
 
-    def score_hard(self, bodies, decodeds, **kwargs):
+    def score_hard(self, bodies, decodeds):
         self.model.eval()
         with torch.no_grad():
             (
@@ -220,7 +220,7 @@ class CoverageModel:
         scores = scores.tolist()
         return {"scores": scores, "effective_mask_ratios": effective_mask_ratios}
 
-    def score_soft(self, bodies, decodeds, printing=False, **kwargs):
+    def score_soft(self, bodies, decodeds):
         (
             input_ids_w,
             is_masked_w,
@@ -229,9 +229,6 @@ class CoverageModel:
             all_masked_words_in_sentences,
         ) = self.build_io(bodies, decodeds)
         scores = self.score_soft_tokenized(input_ids_w, is_masked_w, labels_w)
-
-        if printing:
-            print("[coverage]", scores)
 
         return {
             "scores": scores,
