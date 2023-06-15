@@ -327,7 +327,9 @@ gene_params = {
 }
 
 for idx, paragraphs in enumerate(train_dataloader):
-    if idx == 0:
+    idx += 1
+
+    if idx == 1:
         print("--- Doing evaluation of the model on the val set ---")
         scores = evaluate_model(
             model=simplifier,
@@ -430,7 +432,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         printer.tick(paragraphs, generateds, scorer_returns)
 
         # Since each Wandb.log increase the step, we log the training with the eval to better align results
-        if (idx % eval_frequency) == 0 and idx > 0:
+        if (idx % eval_frequency) == 0 or idx == max_steps:
             torch.cuda.empty_cache()
             print("--- Doing evaluation of the model on the val set ---")
             scores = evaluate_model(
