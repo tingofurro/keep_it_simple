@@ -1,5 +1,9 @@
 from collections import Counter
-import nltk, spacy
+
+import nltk
+import spacy
+
+from evaluation_tools import compute_compression_rate
 
 
 class RelativeBrevityPenalizer:
@@ -7,28 +11,17 @@ class RelativeBrevityPenalizer:
         self.min_ratio = min_ratio
         self.max_ratio = max_ratio
 
-    def compute_compression_ratio(self, source, generated):
-        if source.count(" ") == 0:
-            return 0.0
-        return float(generated.count(" ")) / source.count(" ")
-
-    def score(self, sources, generateds, partial=False, printing=False, **kwargs):
+    def score(self, sources, generateds):
         brevity_penalties = []
         for source, decoded in zip(sources, generateds):
-            brevity_penalty = 0.0
-            compression_ratio = self.compute_compression_ratio(source, decoded)
-            if partial:
-                brevity_penalty = 1.0 if compression_ratio > self.max_ratio else 0.0
-            else:
-                brevity_penalty = (
-                    1.0
-                    if compression_ratio < self.min_ratio
-                    or compression_ratio > self.max_ratio
-                    else 0.0
-                )
+            compression_ratio = compute_compression_rate([source], [decoded])
+            brevity_penalty = (
+                1.0
+                if compression_ratio < self.min_ratio
+                or compression_ratio > self.max_ratio
+                else 0.0
+            )
             brevity_penalties.append(brevity_penalty)
-        if printing:
-            print("[brevity]", brevity_penalties)
         return {"scores": brevity_penalties}
 
 
@@ -38,7 +31,7 @@ class RepeatNGramPenalty:
         self.stop_words = set(nltk.corpus.stopwords.words("english"))
         self.keep_stop_ws = keep_stop_ws
 
-    def score(self, sources, generateds, **kwargs):
+    def score(self, sources, generateds):
         repeat_penalties = []
         for generated in generateds:
             words = nltk.tokenize.word_tokenize(generated.lower())
@@ -265,7 +258,7 @@ class NERInaccuracyPenalty:
         doc = self.spacy_model(text)
         return [{"text": ent.text, "type": ent.label_} for ent in doc.ents]
 
-    def score(self, sources, generateds, printing=False, **kwargs):
+    def score(self, sources, generateds):
         source_ents = [self.extract_entities(text) for text in sources]
         generated_ents = [self.extract_entities(text) for text in generateds]
 

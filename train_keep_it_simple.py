@@ -46,8 +46,6 @@ try:
 except ImportError:
     use_torch_amp = False
 
-n = 500
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "experiment",
@@ -146,22 +144,34 @@ parser.add_argument(
     default="cc_news",
 )
 parser.add_argument("--max_steps", type=int, default="50000")
+parser.add_argument("--n_eval", type=int, default="500")
+parser.add_argument(
+    "--include_original",
+    type=bool_parse,
+    default=False,
+    help="Whether to include the original sentence in the sampled sentence.",
+)
 
 args = parser.parse_args()
 
-args.experiment += "_" + socket.gethostname()
+experiment_name = args.experiment + "_" + socket.gethostname()
 
 wandb.init(project="keep_it_simple")
 wandb.config.update(args)
-wandb.run.name = args.experiment
+wandb.run.name = experiment_name
 
 timing = args.timings
 utils_misc.DoublePrint(
-    "simplifier_%s_%s.log" % (args.experiment, datetime.now().strftime("%Y_%m_%d")),
+    "simplifier_%s_%s.log" % (experiment_name, datetime.now().strftime("%Y_%m_%d")),
     show_timings=timing,
 )
 
-N_samples = args.num_runs
+include_original = args.include_original
+n_samples = args.num_runs
+if include_original:
+    n_samples = n_samples + 1
+
+n_eval = args.n_eval
 max_seq_length = args.max_seq_length
 simplifier = Generator(
     args.model_card,
@@ -174,20 +184,21 @@ simplifier.reload(args.model_start_file)
 simplifier.eval()
 
 train_batch_size = args.train_batch_size
-if args.dataset == "cc_news":
-    train_dataset = load_dataset(args.dataset, split="train")
-    collate_fn = CollateFn(args.dataset).collate_fn
-elif args.dataset == "cnn_dailymail":
-    train_dataset = load_dataset(args.dataset, "3.0.0", split="train")
-    collate_fn = CollateFn(args.dataset).collate_fn
-elif args.dataset == "xsum":
-    train_dataset = load_dataset(args.dataset, split="train")
-    collate_fn = CollateFn(args.dataset).collate_fn
-elif args.dataset == "imdb":
-    train_dataset = load_dataset(args.dataset, split="unsupervised")
-    collate_fn = CollateFn(args.dataset).collate_fn
+dataset_name = args.dataset
+if dataset_name == "cc_news":
+    train_dataset = load_dataset(dataset_name, split="train")
+    collate_fn = CollateFn(dataset_name).collate_fn
+elif dataset_name == "cnn_dailymail":
+    train_dataset = load_dataset(dataset_name, "3.0.0", split="train")
+    collate_fn = CollateFn(dataset_name).collate_fn
+elif dataset_name == "xsum":
+    train_dataset = load_dataset(dataset_name, split="train")
+    collate_fn = CollateFn(dataset_name).collate_fn
+elif dataset_name == "imdb":
+    train_dataset = load_dataset(dataset_name, split="unsupervised")
+    collate_fn = CollateFn(dataset_name).collate_fn
 else:
-    raise ValueError(f"Dataset {args.dataset} not supported.")
+    raise ValueError(f"Dataset {dataset_name} not supported.")
 
 train_dataloader = DataLoader(
     dataset=train_dataset,
@@ -229,14 +240,26 @@ optimizer = utils_optim.build_optimizer(
     learning_rate=args.learning_rate,
 )
 
+output_dir_path = os.path.join(args.ckpt_output_path, dataset_name)
+os.makedirs(output_dir_path, exist_ok=True)
+
 ckpter = utils_rl.RLModelCheckpoint(
     simplifier,
     args.ckpt_every,
     args.ckpt_lookback,
-    os.path.join(args.ckpt_output_path, args.experiment + ".bin"),
+    os.path.join(output_dir_path, experiment_name + ".bin"),
 )
+
+save_path = os.path.join(output_dir_path, experiment_name + ".txt")
+if os.path.exists(save_path):
+    # Clean previous log file if it exist
+    os.remove(save_path)
+
+print_every = args.print_every
 printer = utils_rl.RLExamplePrinter(
-    args.print_every, N_samples, print_source=False, print_edit=True
+    print_every,
+    n_samples,
+    save_path=save_path,
 )
 timer = utils_timing.TickTimer()
 thermostat = utils_rl.RLThermostat()
@@ -275,19 +298,19 @@ scorers = [
         "sign": 1,
     },
     {
-        "name": "gr_repeat",
+        "name": "gr_repeat_penalty",
         "model": RepeatNGramPenalty(gram=3),
         "sign": -1,
         "weight": 2.0,
     },
     {
-        "name": "gr_brevity",
+        "name": "gr_brevity_penalty",
         "model": RelativeBrevityPenalizer(min_ratio=0.6, max_ratio=1.3),
         "sign": -1,
         "weight": 2.0,
     },
     {
-        "name": "gr_hallucination",
+        "name": "gr_hallucination_penalty",
         "model": NERInaccuracyPenalty(),
         "sign": -1,
         "weight": 2.0,
@@ -301,12 +324,12 @@ T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
 max_steps = args.max_steps
-eval_frequency = 5
+eval_frequency = 10
 
 gene_params = {
     "max_output_length": max_seq_length,
     "sample": True,
-    "num_runs": N_samples,
+    "num_runs": n_samples,
     "no_repeat_ngram": 5,
     "max_batch_size": 12,
     "no_copy_ngram": 7,
@@ -320,7 +343,7 @@ for idx, paragraphs in enumerate(train_dataloader):
             model=simplifier,
             coverage_model=coverage_model,
             dataloader=val_dataloader,
-            n=n,
+            n=n_eval,
         )
 
         eval_log = {f"val/{k}": v for k, v in scores.items()}
@@ -334,17 +357,18 @@ for idx, paragraphs in enumerate(train_dataloader):
 
         gens_out = simplifier.generate(paragraphs, **gene_params)
 
-        # We also include the original in the generated as a ground truth
-        # in an attempt to alleviate catastrophic failure.
-        # To do so, we add the sentences as the output text and add the output tokens.
-        gens_out[0].append(
-            {
-                "output_text": paragraphs[0],
-                "output_tokens": simplifier.tokenizer.encode(
-                    paragraphs[0], add_special_tokens=False
-                )[: (simplifier.max_output_length - 1)],
-            }
-        )
+        if include_original:
+            # We also include the original in the generated as a ground truth
+            # in an attempt to alleviate catastrophic failure.
+            # To do so, we add the sentences as the output text and add the output tokens.
+            gens_out[0].append(
+                {
+                    "output_text": paragraphs[0],
+                    "output_tokens": simplifier.tokenizer.encode(
+                        paragraphs[0], add_special_tokens=False
+                    )[: (simplifier.max_output_length - 1)],
+                }
+            )
 
         unlooped_batch = [
             {
@@ -365,8 +389,8 @@ for idx, paragraphs in enumerate(train_dataloader):
         # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
         RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-        # We also increase by one the N_samples since we added the original sentence
-        batch_RS_j = RS_j.reshape(train_batch_size, N_samples + 1)
+        # We also increase by one the n_samples since we added the original sentence
+        batch_RS_j = RS_j.reshape(train_batch_size, n_samples)
 
         R_Overline_S = batch_RS_j.mean(dim=1)
 
@@ -376,13 +400,13 @@ for idx, paragraphs in enumerate(train_dataloader):
         n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
             first_loss_term > 0.02
         ).long().sum().item()
-        # We also increase by one the N_samples since we added the original sentence
+        # We also increase by one the n_samples since we added the original sentence
         print(
             "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
             % (
                 idx,
                 max_steps,
-                train_batch_size * (N_samples + 1),
+                train_batch_size * n_samples,
                 n_diff_pos,
                 n_diff_neg,
             )
@@ -445,7 +469,7 @@ for idx, paragraphs in enumerate(train_dataloader):
                 model=simplifier,
                 coverage_model=coverage_model,
                 dataloader=val_dataloader,
-                n=n,
+                n=n_eval,
             )
 
             log_obj.update({f"val/{k}": v for k, v in scores.items()})
@@ -453,20 +477,28 @@ for idx, paragraphs in enumerate(train_dataloader):
         else:
             wandb.log(log_obj)
 
-        if (idx + 1) == 500:
-            # The first 500 steps, we evaluate it each five steps
-            # Then, for the steps between 500 and 10000, we evaluate it each 100 steps
+        if idx == 100:
+            # The first 100 steps, we evaluate it each 10 steps
+            # Then, for the steps between 100 and 1000, we evaluate it each 100 steps
             # Thus, we raise the eval_frequency
             eval_frequency = 100
-        elif (idx + 1) == 10000:
+            print_every = 150
+        elif idx == 1000:
+            # Then, for the steps between 1000 and 10 000, we evaluate it each 1000 steps
+            eval_frequency = 1000
+        elif idx == 10000:
             # Then, for the steps between 10 000 and max_steps, we evaluate it each 10 000 steps
             eval_frequency = 10000
+
     else:
         break
 
 print("--- Doing evaluation of the model on the test set ---")
 scores = evaluate_model(
-    model=simplifier, coverage_model=coverage_model, dataloader=test_dataloader, n=n
+    model=simplifier,
+    coverage_model=coverage_model,
+    dataloader=test_dataloader,
+    n=n_eval,
 )
 
 # commit=false does not increment Steps in log

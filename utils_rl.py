@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 
@@ -151,36 +152,42 @@ class RLModelCheckpoint:
 
 
 class RLExamplePrinter:
-    def __init__(self, print_every, N_samples, print_source=False, print_edit=False):
+    def __init__(
+        self,
+        print_every,
+        n_samples,
+        save_path: str,
+    ):
         self.print_every = print_every
-        self.N_samples = N_samples
-        self.print_source = print_source
-        self.print_edit = print_edit
+        self.n_samples = n_samples
+        self.save_path = save_path
         self.time_print = time.time()
 
-    def tick(self, paragraphs, generateds, scorer_returns):
-        if time.time() - self.time_print > self.print_every:
+    def tick(
+        self, paragraphs, generateds, scorer_returns, include_original: bool = False
+    ):
+        if include_original:
             # +1 since we also include the original sentence
-            IDX = int(np.argmax(scorer_returns["total_scores"]) / (self.N_samples + 1))
-            if self.print_source:
-                print("----------- ORIGINAL -------------")
-                print(paragraphs[IDX])
+            n_samples = self.n_samples + 1
+        else:
+            n_samples = self.n_samples
 
-            print("----------- GENERATED OPTIONS ---------")
+        if time.time() - self.time_print > self.print_every:
+            IDX = int(np.argmax(scorer_returns["total_scores"]) / n_samples)
+
+            log_message = "----------- GENERATED OPTIONS ---------\n"
             gen_is = sorted(
-                range(self.N_samples * IDX, self.N_samples * (IDX + 1)),
+                range(self.n_samples * IDX, self.n_samples * (IDX + 1)),
                 key=lambda gen_i: -scorer_returns["total_scores"][gen_i],
-            )  # Ordered from best scoring to smallest scoring
+            )  # Ordered from best scoring to the smallest scoring
 
             for gen_i in gen_is:
-                if self.print_edit:
-                    print(
-                        utils_edits.show_diff_word(paragraphs[IDX], generateds[gen_i])
-                    )
-                else:
-                    print(generateds[gen_i])
-                print(
-                    "["
+                log_message += utils_edits.show_diff_word(
+                    paragraphs[IDX], generateds[gen_i]
+                )
+
+                log_message += (
+                    "\n["
                     + "; ".join(
                         [
                             "%s: %.4f"
@@ -189,9 +196,13 @@ class RLExamplePrinter:
                             if ("_score" in k or "pred_level" in k)
                         ]
                     )
-                    + "]"
+                    + "]\n---\n"
                 )
-                print("---")
 
             self.time_print = time.time()
-            print("==========================================")
+            log_message += "\n==========================================\n"
+
+            print(log_message)
+
+            with open(self.save_path, "a", encoding="utf-8") as file:
+                file.writelines(log_message)

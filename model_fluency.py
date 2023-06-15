@@ -57,9 +57,9 @@ class FluencyRelativeScore:
             loss_per = torch.sum(loss, dim=1) / non_pad_count
         return loss_per
 
-    def score(self, sources, generateds, partial=False, printing=False, **kwargs):
+    def score(self, sources, generateds):
         up_to_length = None
-        if self.same_length or partial:
+        if self.same_length:
             up_to_length = len(self.tokenizer.encode(generateds[0]))
 
         sources_score = self.text2loss(sources, up_to_length=up_to_length)
@@ -67,8 +67,6 @@ class FluencyRelativeScore:
         scores = (1.3 + sources_score - generateds_score) / 1.3
         scores = torch.clamp(scores, 0.001, 1.0).tolist()
 
-        if printing:
-            print("[fluency]", scores)
         return {
             "scores": scores,
             "sources_loss": sources_score,
@@ -235,7 +233,7 @@ class TextDiscriminator:
 
         self.train_from_dataset(texts, labels, n_epochs=3)
 
-    def retrain_files(self, data_files, old_format=False):
+    def retrain_files(self, data_files):
         sentences, labels = [], []
         sentence_set = set([])
         for data_file in data_files:
@@ -250,10 +248,7 @@ class TextDiscriminator:
         self.train_from_dataset(sentences, labels, n_epochs=5)
         return None
 
-    def score(self, sources, generateds, partial=False, printing=False, **kwargs):
-        if partial:
-            # We don't do partial discrimination, wouldn't make sense...
-            return {"scores": [1.0] * len(sources)}
+    def score(self, sources, generateds):
         self.cache_sources += sources
         self.cache_generateds += generateds
 
@@ -291,7 +286,5 @@ class TextDiscriminator:
                 scores = torch.clamp(probs[:, 1], 0.0001, 1.0)
 
         scores = scores.tolist()
-        if printing:
-            print("[discriminator]", scores)
 
         return {"scores": scores, "val_f1": [self.last_val_f1] * len(scores)}
