@@ -407,7 +407,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         print(
             "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
             % (
-                idx,
+                (idx + 1),
                 max_steps,
                 train_batch_size * batch_sample_size,
                 n_diff_pos,
@@ -467,7 +467,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         )
 
         # Since each Wandb.log increase the step, we log the training with the eval to better align results
-        if (idx % eval_frequency) == 0 and idx > 0:
+        if (idx % eval_frequency) == 0 or (idx + 1) == max_steps and idx > 0:
             torch.cuda.empty_cache()
             print("--- Doing evaluation of the model on the val set ---")
             scores = evaluate_model(
@@ -506,13 +506,5 @@ scores = evaluate_model(
     n=n_eval,
 )
 
-# commit=false does not increment Steps in log
-test_log_obj = {
-    "test/average_sari_score": scores["average_sari_score"],
-    "test/average_bleu_score": scores["average_bleu_score"],
-    "test/fkgl_ratio_score": scores["fkgl_ratio_score"],
-    "test/average_compression_rate_score": scores["average_compression_rate_score"],
-    "test/average_coverage_rate_score": scores["average_coverage_rate_score"],
-}
-
-wandb.log(test_log_obj, commit=False)
+test_log_obj = {f"test/{k}": v for k, v in scores.items()}
+wandb.log(test_log_obj, commit=False)  # commit=false does not increment Steps in log
