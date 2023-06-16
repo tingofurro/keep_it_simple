@@ -1,4 +1,7 @@
+import time
+import xmlrpc
 from typing import List
+from xmlrpc.client import ServerProxy
 
 import nltk
 from evaluate import load
@@ -46,13 +49,35 @@ class FKGLRatio(RatioMetric):
         self._fkgl_scores.append((references_fkgl_score, predictions_fkgl_score))
 
 
+username = r"david.beauchemin@ift.ulaval.ca"
+password = r"Lexile_2023!"
+
+rpc = ServerProxy(f"https://{username}:{password}@la.lexile.com/API")
+
+
 def compute_lexile(text: str) -> float:
-    # todo add: compute %Lexile waiting feedback from email sent March 29th (72 hours delay from email).
-    ## Use API https://partnerhelp.metametricsinc.com/concept/c_la_api_overview.html
-    ## Need to develop code to process it
-    ## Need an API key
-    ## Possible implementation in Python https://github.com/altarac/Lexile-scoring
-    return 1
+    rpc_analyser_return = None
+    try:
+        rpc_analyser_return = rpc.analyzer.analyze(text)
+    except xmlrpc.client.ProtocolError as error:
+        print(f"Execution error Lexile {error}, waiting 35 seconds before retry.")
+        time.sleep(35)
+        try:
+            rpc_analyser_return = rpc.analyzer.analyze(text)
+        except xmlrpc.client.ProtocolError as error:
+            print(f"Second execution error Lexile {error}, waiting 35 seconds.")
+
+            time.sleep(35)
+            try:
+                rpc_analyser_return = rpc.analyzer.analyze(text)
+            except xmlrpc.client.ProtocolError as error:
+                print(f"Third execution error Lexile {error}, will skip this example.")
+                pass
+    if rpc_analyser_return is not None:
+        lexile_score = rpc_analyser_return.get("lexile")
+    else:
+        lexile_score = 0
+    return lexile_score
 
 
 class LexileRatio(RatioMetric):
