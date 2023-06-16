@@ -480,7 +480,9 @@ for idx, paragraphs in enumerate(train_dataloader):
         T_last_best = time.time()
 
     # Run the Printing engine
-    printer.tick(paragraphs, generateds, scorer_returns)
+    printer.tick(
+        paragraphs, generateds, scorer_returns, include_original=include_original
+    )
 
     # Since each Wandb.log increase the step, we log the training with the eval to better align results
     if ((idx % eval_frequency) == 0 or (idx + 1) == max_steps) and idx > 0:
