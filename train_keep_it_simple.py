@@ -1,3 +1,5 @@
+from functools import partial
+
 import utils_misc
 from tools import bool_parse
 
@@ -15,10 +17,10 @@ from datasets import Dataset
 
 from evaluation import evaluate_model
 from utils_dataset import (
-    CollateFn,
+    keyed_collate_fn,
 )
 
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader, random_split
 
 from model_salience import CoverageModel
 from model_fluency import FluencyRelativeScore, TextDiscriminator
@@ -162,6 +164,7 @@ utils_misc.DoublePrint(
 
 N_samples = args.num_runs
 n_eval = args.n_eval
+
 max_seq_length = args.max_seq_length
 simplifier = Generator(
     args.model_card,
@@ -177,37 +180,49 @@ train_batch_size = args.train_batch_size
 dataset_name = args.dataset
 if dataset_name == "cc_news":
     train_dataset = load_dataset(dataset_name, split="train")
-    collate_fn = CollateFn(dataset_name).collate_fn
+    train_collate_fn = partial(keyed_collate_fn, key="text")
 elif dataset_name == "cnn_dailymail":
     train_dataset = load_dataset(dataset_name, "3.0.0", split="train")
-    collate_fn = CollateFn(dataset_name).collate_fn
+    train_collate_fn = partial(keyed_collate_fn, key="article")
 elif dataset_name == "xsum":
     train_dataset = load_dataset(dataset_name, split="train")
-    collate_fn = CollateFn(dataset_name).collate_fn
+    train_collate_fn = partial(keyed_collate_fn, key="document")
 elif dataset_name == "imdb":
     train_dataset = load_dataset(dataset_name, split="unsupervised")
-    collate_fn = CollateFn(dataset_name).collate_fn
+    train_collate_fn = partial(keyed_collate_fn, key="text")
 else:
     raise ValueError(f"Dataset {dataset_name} not supported.")
 
+max_steps = args.max_steps
+
+# We split the dataset into train and val subset of length max_steps and the rest of the dataset.
+train_indices_max_steps, _ = random_split(
+    train_dataset, [max_steps, len(train_dataset) - max_steps]
+)
+train_split_max_steps = train_dataset.select(train_indices_max_steps.indices)
+
 train_dataloader = DataLoader(
-    dataset=train_dataset,
+    dataset=train_split_max_steps,
     batch_size=train_batch_size,
-    sampler=RandomSampler(train_dataset),
     drop_last=True,
-    collate_fn=collate_fn,
+    collate_fn=train_collate_fn,
 )
 
-newsela_collate = CollateFn("newsela").collate_fn
-# The val dataset to eval after each 10K steps + at zero steps
+n_eval = args.n_eval
+
+newsela_collate = partial(keyed_collate_fn, key="p1")
+# The val dataset to eval at specific steps
 dataset_df = pd.read_csv(os.path.join("datastore", "newsela_paired_0.2.csv"))
 val_dataset_df = dataset_df[dataset_df["cut"] == "train"]
 val_dataset = Dataset.from_pandas(val_dataset_df)
 
+# We split the dataset into val and empty subset of length n_eval and the rest of the dataset.
+val_indices_n_eval, _ = random_split(val_dataset, [n_eval, len(val_dataset) - n_eval])
+val_split_n_eval = val_dataset.select(val_indices_n_eval.indices)
+
 val_dataloader = DataLoader(
-    dataset=val_dataset,
+    dataset=val_split_n_eval,
     batch_size=train_batch_size,
-    sampler=RandomSampler(val_dataset),
     drop_last=True,
     collate_fn=newsela_collate,
 )
@@ -215,13 +230,18 @@ val_dataloader = DataLoader(
 # The test dataset use as the final evaluation of the model
 test_dataset_df = dataset_df[dataset_df["cut"] == "dev"]
 test_dataset = Dataset.from_pandas(test_dataset_df)
+
+# We split the dataset into test and empty of length n_eval and the rest of the dataset.
+test_indices_n_eval, _ = random_split(
+    test_dataset, [n_eval, len(test_dataset) - n_eval]
+)
+test_split_n_eval = test_dataset.select(test_indices_n_eval.indices)
+
 test_dataloader = DataLoader(
     dataset=test_dataset,
     batch_size=train_batch_size,
-    sampler=RandomSampler(test_dataset),
     drop_last=True,
     collate_fn=newsela_collate,
-    pin_memory=True,
 )
 
 optimizer = utils_optim.build_optimizer(
@@ -313,7 +333,6 @@ scorer = utils_scoring.ScorerWrapper(
 T_start, T_last_best = time.time(), time.time()
 temperature = 1.0
 
-max_steps = args.max_steps
 eval_frequency = 10
 
 gene_params = {
@@ -327,6 +346,8 @@ gene_params = {
 }
 
 for idx, paragraphs in enumerate(train_dataloader):
+    T_batch_start = time.time()
+
     if idx == 0:
         print("--- Doing evaluation of the model on the val set ---")
         scores = evaluate_model(
@@ -341,131 +362,126 @@ for idx, paragraphs in enumerate(train_dataloader):
             eval_log, commit=False
         )  # commit=false does not increment Steps in log
 
-    # We do max_steps steps
-    if idx < max_steps:
-        T_batch_start = time.time()
+    T_batch_start = time.time()
 
-        # Doing real, sampled generation
-        gens_out = simplifier.generate(paragraphs, **gene_params)
-        unlooped_batch = [
-            {
-                "paragraph": p,
-                "generated": gen["output_text"],
-                "generated_tokenized": gen["output_tokens"],
-            }
-            for p, gens in zip(paragraphs, gens_out)
-            for gen in gens
-        ]
-        unlooped_paragraphs = [d["paragraph"] for d in unlooped_batch]
-        generateds = [d["generated"] for d in unlooped_batch]
-        generateds_tokenized = [d["generated_tokenized"] for d in unlooped_batch]
-        timer.tick("sampled_generation")
-
-        scorer_returns = scorer.score(unlooped_paragraphs, generateds)
-
-        # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
-        RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
-
-        batch_RS_j = RS_j.reshape(train_batch_size, N_samples)
-        R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
-
-        timer.tick("all_scores")
-        # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
-        first_loss_term = R_Overline_S - batch_RS_j
-        n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
-            first_loss_term > 0.02
-        ).long().sum().item()
-        print(
-            "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
-            % (
-                (idx + 1),
-                max_steps,
-                train_batch_size * N_samples,
-                n_diff_pos,
-                n_diff_neg,
-            )
-        )
-
-        diversity = len(set(generateds)) / len(generateds)
-        temperature = thermostat.log_diversity(diversity)
-        loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
-        timer.tick("optim")
-
-        batch_time = time.time() - T_batch_start
-        log_obj = {
-            "train/loss": loss,
-            "train/max_scores": torch.max(RS_j),
-            "train/temperature": temperature,
-            "train/elem_per_sec": (len(generateds) / (batch_time + 0.001)),
+    # Doing real, sampled generation
+    gens_out = simplifier.generate(paragraphs, **gene_params)
+    unlooped_batch = [
+        {
+            "paragraph": p,
+            "generated": gen["output_text"],
+            "generated_tokenized": gen["output_tokens"],
         }
-        log_obj.update(
-            {
-                f"train/mean_{k}": np.mean(v)
-                for k, v in scorer_returns.items()
-                if "_scores" in k or k in ["fluency_disc_val_f1"]
-            }
+        for p, gens in zip(paragraphs, gens_out)
+        for gen in gens
+    ]
+    unlooped_paragraphs = [d["paragraph"] for d in unlooped_batch]
+    generateds = [d["generated"] for d in unlooped_batch]
+    generateds_tokenized = [d["generated_tokenized"] for d in unlooped_batch]
+    timer.tick("sampled_generation")
+
+    scorer_returns = scorer.score(unlooped_paragraphs, generateds)
+
+    # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
+    RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
+
+    batch_RS_j = RS_j.reshape(train_batch_size, N_samples)
+    R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
+
+    timer.tick("all_scores")
+    # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
+    first_loss_term = R_Overline_S - batch_RS_j
+    n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
+        first_loss_term > 0.02
+    ).long().sum().item()
+    print(
+        "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
+        % (
+            (idx + 1),
+            max_steps,
+            train_batch_size * N_samples,
+            n_diff_pos,
+            n_diff_neg,
         )
-        log_obj.update(
-            {
-                f"train/{k}": v
-                for k, v in scorer_returns.items()
-                if "_scores" in k or k in ["fluency_disc_val_f1"]
-            }
+    )
+
+    diversity = len(set(generateds)) / len(generateds)
+    temperature = thermostat.log_diversity(diversity)
+    loss = rl_crit(unlooped_paragraphs, generateds_tokenized, first_loss_term)
+    timer.tick("optim")
+
+    batch_time = time.time() - T_batch_start
+    log_obj = {
+        "train/loss": loss,
+        "train/max_scores": torch.max(RS_j),
+        "train/temperature": temperature,
+        "train/elem_per_sec": (len(generateds) / (batch_time + 0.001)),
+    }
+    log_obj.update(
+        {
+            f"train/mean_{k}": np.mean(v)
+            for k, v in scorer_returns.items()
+            if "_scores" in k or k in ["fluency_disc_val_f1"]
+        }
+    )
+    log_obj.update(
+        {
+            f"train/{k}": v
+            for k, v in scorer_returns.items()
+            if "_scores" in k or k in ["fluency_disc_val_f1"]
+        }
+    )
+    log_obj.update(
+        {
+            "train/coverage_original_sentence": scorer_returns[
+                "coverage_original_sentence"
+            ][0],
+            "train/coverage_all_masked_words_in_sentence": "; ".join(
+                scorer_returns["coverage_all_masked_words_in_sentences"][0]
+            ),
+            "train/coverage_effective_mask_ratio": scorer_returns[
+                "coverage_effective_mask_ratios"
+            ][0],
+        }
+    )
+
+    # Run the Checkpoint engine
+    current_score = np.mean(scorer_returns["total_scores"])
+    is_best = ckpter.tick(current_score)
+    if is_best:  # Run the inspection dataset through
+        T_last_best = time.time()
+
+    # Run the Printing engine
+    printer.tick(paragraphs, generateds, scorer_returns)
+
+    # Since each Wandb.log increase the step, we log the training with the eval to better align results
+    if (idx % eval_frequency) == 0 or (idx + 1) == max_steps and idx > 0:
+        torch.cuda.empty_cache()
+        print("--- Doing evaluation of the model on the val set ---")
+        scores = evaluate_model(
+            model=simplifier,
+            coverage_model=coverage_model,
+            dataloader=val_dataloader,
+            n=n_eval,
         )
-        log_obj.update(
-            {
-                "train/coverage_original_sentence": scorer_returns[
-                    "coverage_original_sentence"
-                ][0],
-                "train/coverage_all_masked_words_in_sentence": "; ".join(
-                    scorer_returns["coverage_all_masked_words_in_sentences"][0]
-                ),
-                "train/coverage_effective_mask_ratio": scorer_returns[
-                    "coverage_effective_mask_ratios"
-                ][0],
-            }
-        )
 
-        # Run the Checkpoint engine
-        current_score = np.mean(scorer_returns["total_scores"])
-        is_best = ckpter.tick(current_score)
-        if is_best:  # Run the inspection dataset through
-            T_last_best = time.time()
-
-        # Run the Printing engine
-        printer.tick(paragraphs, generateds, scorer_returns)
-
-        # Since each Wandb.log increase the step, we log the training with the eval to better align results
-        if (idx % eval_frequency) == 0 or (idx + 1) == max_steps and idx > 0:
-            torch.cuda.empty_cache()
-            print("--- Doing evaluation of the model on the val set ---")
-            scores = evaluate_model(
-                model=simplifier,
-                coverage_model=coverage_model,
-                dataloader=val_dataloader,
-                n=n_eval,
-            )
-
-            log_obj.update({f"val/{k}": v for k, v in scores.items()})
-            wandb.log(log_obj)
-        else:
-            wandb.log(log_obj)
-
-        if idx == 100:
-            # The first 100 steps, we evaluate it each 10 steps
-            # Then, for the steps between 100 and 1000, we evaluate it each 100 steps
-            # Thus, we raise the eval_frequency
-            eval_frequency = 100
-            print_every = 150
-        elif idx == 1000:
-            # Then, for the steps between 1000 and 10 000, we evaluate it each 1000 steps
-            eval_frequency = 1000
-        elif idx == 10000:
-            # Then, for the steps between 10 000 and max_steps, we evaluate it each 10 000 steps
-            eval_frequency = 10000
-
+        log_obj.update({f"val/{k}": v for k, v in scores.items()})
+        wandb.log(log_obj)
     else:
-        break
+        wandb.log(log_obj)
+
+    if idx == 100:
+        # The first 100 steps, we evaluate it each 10 steps
+        # Then, for the steps between 100 and 1000, we evaluate it each 100 steps
+        # Thus, we raise the eval_frequency
+        eval_frequency = 100
+        print_every = 150
+    elif idx == 1000:
+        # Then, for the steps between 1000 and 10 000, we evaluate it each 1000 steps
+        eval_frequency = 1000
+    elif idx == 10000:
+        # Then, for the steps between 10 000 and max_steps, we evaluate it each 10 000 steps
+        eval_frequency = 10000
 
 print("--- Doing evaluation of the model on the test set ---")
 scores = evaluate_model(
