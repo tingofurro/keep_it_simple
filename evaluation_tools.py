@@ -1,9 +1,8 @@
 import time
 import xmlrpc
-from typing import List
+from typing import List, Union
 from xmlrpc.client import ServerProxy
 
-import nltk
 from evaluate import load
 from textstat import textstat
 
@@ -55,28 +54,27 @@ password = r"Lexile_2023!"
 rpc = ServerProxy(f"https://{username}:{password}@la.lexile.com/API")
 
 
-def compute_lexile(text: str) -> float:
+def compute_lexile(text: str) -> Union[float, None]:
     rpc_analyser_return = None
-    try:
-        rpc_analyser_return = rpc.analyzer.analyze(text)
-    except xmlrpc.client.ProtocolError as error:
-        print(f"Execution error Lexile {error}, waiting 35 seconds before retry.")
-        time.sleep(35)
+    attempts = 1
+    while rpc_analyser_return is None:
+        # We need broad error handling since strange behavior with some catch
+        if attempts == 4:
+            return None
         try:
-            rpc_analyser_return = rpc.analyzer.analyze(text)
-        except xmlrpc.client.ProtocolError as error:
-            print(f"Second execution error Lexile {error}, waiting 35 seconds.")
-
+            rpc_analyser_return = rpc.analyzer.analyze(text, "English")
+        except xmlrpc.client.ProtocolError:
             time.sleep(35)
-            try:
-                rpc_analyser_return = rpc.analyzer.analyze(text)
-            except xmlrpc.client.ProtocolError as error:
-                print(f"Third execution error Lexile {error}, will skip this example.")
-                pass
-    if rpc_analyser_return is not None:
-        lexile_score = rpc_analyser_return.get("lexile")
-    else:
-        lexile_score = 0
+            attempts += 1
+        except xmlrpc.client.Fault:
+            return 0
+        except xmlrpc.client.Error:
+            time.sleep(35)
+            attempts += 1
+        except:
+            time.sleep(35)
+            attempts += 1
+    lexile_score = rpc_analyser_return.get("lexile")
     return lexile_score
 
 
@@ -99,13 +97,23 @@ class LexileRatio(RatioMetric):
 
         compute % of lexile_simplified_lowered / 500 * 100
         """
-        references_lexile_score = compute_lexile(references)
-        predictions_lexile_score = compute_lexile(predictions)
+        try:
+            references_lexile_score = compute_lexile(references)
+        except:
+            references_lexile_score = None
+        try:
+            predictions_lexile_score = compute_lexile(predictions)
+        except:
+            predictions_lexile_score = None
 
-        if predictions_lexile_score < references_lexile_score:
-            self._running_score += 1
-
-        self._lexile_scores.append((references_lexile_score, predictions_lexile_score))
+        if references_lexile_score is not None and predictions_lexile_score is not None:
+            # To handle cases where one of the two lexile score was not compute after 4 attempts.
+            # In that case, we skip this example.
+            if predictions_lexile_score < references_lexile_score:
+                self._running_score += 1
+            self._lexile_scores.append(
+                (references_lexile_score, predictions_lexile_score)
+            )
 
 
 def compute_sari(references: List, predictions: List) -> float:

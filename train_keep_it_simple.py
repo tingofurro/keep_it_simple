@@ -147,6 +147,7 @@ parser.add_argument(
 )
 parser.add_argument("--max_steps", type=int, default="50000")
 parser.add_argument("--n_eval", type=int, default="500")
+parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
 
 args = parser.parse_args()
 
@@ -345,12 +346,14 @@ gene_params = {
     "temperature": temperature,
 }
 
+compute_eval_lexile = args.compute_eval_lexile
+
 print("--- Doing evaluation of the model on the val set ---")
 scores = evaluate_model(
     model=simplifier,
     coverage_model=coverage_model,
     dataloader=val_dataloader,
-    n=n_eval,
+    lexile_compute=compute_eval_lexile,
 )
 
 eval_log = {f"val/{k}": v for k, v in scores.items()}
@@ -460,7 +463,7 @@ for idx, paragraphs in enumerate(train_dataloader):
             model=simplifier,
             coverage_model=coverage_model,
             dataloader=val_dataloader,
-            n=n_eval,
+            lexile_compute=compute_eval_lexile,
         )
 
         log_obj.update({f"val/{k}": v for k, v in scores.items()})
@@ -485,7 +488,7 @@ scores = evaluate_model(
     model=simplifier,
     coverage_model=coverage_model,
     dataloader=test_dataloader,
-    n=n_eval,
+    lexile_compute=True,
 )
 
 test_log_obj = {f"test/{k}": v for k, v in scores.items()}
