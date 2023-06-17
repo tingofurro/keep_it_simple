@@ -64,15 +64,15 @@ def compute_lexile(text: str) -> Union[float, None]:
         try:
             rpc_analyser_return = rpc.analyzer.analyze(text, "English")
         except xmlrpc.client.ProtocolError:
-            time.sleep(35)
+            time.sleep(5)
             attempts += 1
         except xmlrpc.client.Fault:
             return 0
         except xmlrpc.client.Error:
-            time.sleep(35)
+            time.sleep(5)
             attempts += 1
         except:
-            time.sleep(35)
+            time.sleep(5)
             attempts += 1
     lexile_score = rpc_analyser_return.get("lexile")
     return lexile_score
@@ -89,13 +89,15 @@ class LexileRatio(RatioMetric):
         sentence (predictions). If the simplified LExile score is lower than the original LExile score we increment a
         counter to compute the number of time simplified score is lower than the original sentence.
 
+        About the Lexile score: - higher is worse.
+
         Algorithm:
 
         compute Lexile of the original sentence -> lexile_original
         compute LExile of the simplified sentence -> lexile_simplified
         if lexile_simplified < lexile_original: lexile_simplified_lowered += 1
 
-        compute % of lexile_simplified_lowered / 500 * 100
+        compute % of lexile_simplified_lowered / sample_size * 100
         """
         try:
             references_lexile_score = compute_lexile(references)
