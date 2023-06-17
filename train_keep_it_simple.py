@@ -345,23 +345,20 @@ gene_params = {
     "temperature": temperature,
 }
 
+print("--- Doing evaluation of the model on the val set ---")
+scores = evaluate_model(
+    model=simplifier,
+    coverage_model=coverage_model,
+    dataloader=val_dataloader,
+    n=n_eval,
+)
+
+eval_log = {f"val/{k}": v for k, v in scores.items()}
+eval_log.update({"training_step": 0})
+wandb.log(eval_log)
+
 for idx, paragraphs in enumerate(train_dataloader):
-    T_batch_start = time.time()
-
-    if idx == 0:
-        print("--- Doing evaluation of the model on the val set ---")
-        scores = evaluate_model(
-            model=simplifier,
-            coverage_model=coverage_model,
-            dataloader=val_dataloader,
-            n=n_eval,
-        )
-
-        eval_log = {f"val/{k}": v for k, v in scores.items()}
-        wandb.log(
-            eval_log, commit=False
-        )  # commit=false does not increment Steps in log
-
+    idx += 1
     T_batch_start = time.time()
 
     # Doing real, sampled generation
@@ -397,7 +394,7 @@ for idx, paragraphs in enumerate(train_dataloader):
     print(
         "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
         % (
-            (idx + 1),
+            idx,
             max_steps,
             train_batch_size * N_samples,
             n_diff_pos,
@@ -412,6 +409,7 @@ for idx, paragraphs in enumerate(train_dataloader):
 
     batch_time = time.time() - T_batch_start
     log_obj = {
+        "training_step": idx,
         "train/loss": loss,
         "train/max_scores": torch.max(RS_j),
         "train/temperature": temperature,
@@ -455,7 +453,7 @@ for idx, paragraphs in enumerate(train_dataloader):
     printer.tick(paragraphs, generateds, scorer_returns)
 
     # Since each Wandb.log increase the step, we log the training with the eval to better align results
-    if ((idx % eval_frequency) == 0 or (idx + 1) == max_steps) and idx > 0:
+    if (idx % eval_frequency) == 0 or idx == max_steps:
         torch.cuda.empty_cache()
         print("--- Doing evaluation of the model on the val set ---")
         scores = evaluate_model(
@@ -466,9 +464,8 @@ for idx, paragraphs in enumerate(train_dataloader):
         )
 
         log_obj.update({f"val/{k}": v for k, v in scores.items()})
-        wandb.log(log_obj)
-    else:
-        wandb.log(log_obj)
+
+    wandb.log(log_obj)
 
     if idx == 100:
         # The first 100 steps, we evaluate it each 10 steps
@@ -492,4 +489,5 @@ scores = evaluate_model(
 )
 
 test_log_obj = {f"test/{k}": v for k, v in scores.items()}
-wandb.log(test_log_obj, commit=False)  # commit=false does not increment Steps in log
+test_log_obj.update({"training_step": max_steps})
+wandb.log(test_log_obj)
