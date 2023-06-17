@@ -147,6 +147,12 @@ parser.add_argument(
 )
 parser.add_argument("--max_steps", type=int, default="50000")
 parser.add_argument("--n_eval", type=int, default="500")
+parser.add_argument(
+    "--include_original",
+    type=bool_parse,
+    default=False,
+    help="Whether to include the original sentence in the sampled sentence.",
+)
 parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
 
 args = parser.parse_args()
@@ -163,7 +169,9 @@ utils_misc.DoublePrint(
     show_timings=timing,
 )
 
-N_samples = args.num_runs
+include_original = args.include_original
+n_samples = args.num_runs
+
 n_eval = args.n_eval
 
 max_seq_length = args.max_seq_length
@@ -269,7 +277,7 @@ if os.path.exists(save_path):
 print_every = args.print_every
 printer = utils_rl.RLExamplePrinter(
     print_every,
-    N_samples,
+    n_samples,
     save_path=save_path,
 )
 timer = utils_timing.TickTimer()
@@ -339,12 +347,19 @@ eval_frequency = 10
 gene_params = {
     "max_output_length": max_seq_length,
     "sample": True,
-    "num_runs": N_samples,
+    "num_runs": n_samples,
     "no_repeat_ngram": 5,
     "max_batch_size": 12,
     "no_copy_ngram": 7,
     "temperature": temperature,
 }
+
+
+if include_original:
+    # We also increase by one the n_samples since we will add the original sentence
+    batch_sample_size = n_samples + 1
+else:
+    batch_sample_size = n_samples
 
 compute_eval_lexile = args.compute_eval_lexile
 
@@ -366,6 +381,20 @@ for idx, paragraphs in enumerate(train_dataloader):
 
     # Doing real, sampled generation
     gens_out = simplifier.generate(paragraphs, **gene_params)
+
+    if include_original:
+        # We also include the original in the generated as a ground truth
+        # in an attempt to alleviate catastrophic failure.
+        # To do so, we add the sentences as the output text and add the output tokens.
+        gens_out[0].append(
+            {
+                "output_text": paragraphs[0],
+                "output_tokens": simplifier.tokenizer.encode(
+                    paragraphs[0], add_special_tokens=False
+                )[: (simplifier.max_output_length - 1)],
+            }
+        )
+
     unlooped_batch = [
         {
             "paragraph": p,
@@ -385,8 +414,9 @@ for idx, paragraphs in enumerate(train_dataloader):
     # total_scores are the RS_j value i.e. the product of the rewards terms as per article.
     RS_j = torch.FloatTensor(scorer_returns["total_scores"]).cuda()
 
-    batch_RS_j = RS_j.reshape(train_batch_size, N_samples)
-    R_Overline_S = torch.repeat_interleave(batch_RS_j.mean(dim=1), N_samples)
+    batch_RS_j = RS_j.reshape(train_batch_size, batch_sample_size)
+
+    R_Overline_S = batch_RS_j.mean(dim=1)
 
     timer.tick("all_scores")
     # The first loss term is the R Overline S minus RS_j (see equation 5 in article).
@@ -394,12 +424,13 @@ for idx, paragraphs in enumerate(train_dataloader):
     n_diff_pos, n_diff_neg = (first_loss_term < -0.02).long().sum().item(), (
         first_loss_term > 0.02
     ).long().sum().item()
+    # We also increase by one the n_samples since we added the original sentence
     print(
         "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
         % (
             idx,
             max_steps,
-            train_batch_size * N_samples,
+            train_batch_size * batch_sample_size,
             n_diff_pos,
             n_diff_neg,
         )
@@ -418,6 +449,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         "train/temperature": temperature,
         "train/elem_per_sec": (len(generateds) / (batch_time + 0.001)),
     }
+
     log_obj.update(
         {
             f"train/mean_{k}": np.mean(v)
@@ -453,7 +485,9 @@ for idx, paragraphs in enumerate(train_dataloader):
         T_last_best = time.time()
 
     # Run the Printing engine
-    printer.tick(paragraphs, generateds, scorer_returns)
+    printer.tick(
+        paragraphs, generateds, scorer_returns, include_original=include_original
+    )
 
     # Since each Wandb.log increase the step, we log the training with the eval to better align results
     if (idx % eval_frequency) == 0 or idx == max_steps:

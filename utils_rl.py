@@ -155,23 +155,31 @@ class RLExamplePrinter:
     def __init__(
         self,
         print_every,
-        N_samples,
+        n_samples,
         save_path: str,
     ):
         self.print_every = print_every
-        self.N_samples = N_samples
+        self.n_samples = n_samples
         self.save_path = save_path
         self.time_print = time.time()
 
-    def tick(self, paragraphs, generateds, scorer_returns):
+    def tick(
+        self, paragraphs, generateds, scorer_returns, include_original: bool = False
+    ):
+        if include_original:
+            # +1 since we also include the original sentence
+            n_samples = self.n_samples + 1
+        else:
+            n_samples = self.n_samples
+
         if time.time() - self.time_print > self.print_every:
-            IDX = int(np.argmax(scorer_returns["total_scores"]) / self.N_samples)
+            IDX = int(np.argmax(scorer_returns["total_scores"]) / n_samples)
 
             log_message = "----------- GENERATED OPTIONS ---------\n"
             gen_is = sorted(
-                range(self.N_samples * IDX, self.N_samples * (IDX + 1)),
+                range(n_samples * IDX, n_samples * (IDX + 1)),
                 key=lambda gen_i: -scorer_returns["total_scores"][gen_i],
-            )  # Ordered from best scoring to smallest scoring
+            )  # Ordered from best scoring to the smallest scoring
 
             for gen_i in gen_is:
                 log_message += utils_edits.show_diff_word(
