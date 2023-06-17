@@ -145,7 +145,7 @@ parser.add_argument(
     type=str,
     default="cc_news",
 )
-parser.add_argument("--max_steps", type=int, default="50000")
+parser.add_argument("--max_steps", type=int, default="40000")
 parser.add_argument("--n_eval", type=int, default="500")
 parser.add_argument(
     "--include_original",
@@ -464,19 +464,6 @@ for idx, paragraphs in enumerate(train_dataloader):
             if "_scores" in k or k in ["fluency_disc_val_f1"]
         }
     )
-    log_obj.update(
-        {
-            "train/coverage_original_sentence": scorer_returns[
-                "coverage_original_sentence"
-            ][0],
-            "train/coverage_all_masked_words_in_sentence": "; ".join(
-                scorer_returns["coverage_all_masked_words_in_sentences"][0]
-            ),
-            "train/coverage_effective_mask_ratio": scorer_returns[
-                "coverage_effective_mask_ratios"
-            ][0],
-        }
-    )
 
     # Run the Checkpoint engine
     current_score = np.mean(scorer_returns["total_scores"])
@@ -509,7 +496,7 @@ for idx, paragraphs in enumerate(train_dataloader):
         # Then, for the steps between 100 and 1000, we evaluate it each 100 steps
         # Thus, we raise the eval_frequency
         eval_frequency = 100
-        print_every = 150
+        print_every = 300
     elif idx == 1000:
         # Then, for the steps between 1000 and 10 000, we evaluate it each 1000 steps
         eval_frequency = 1000
