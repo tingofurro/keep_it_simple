@@ -153,6 +153,7 @@ parser.add_argument(
     default=False,
     help="Whether to include the original sentence in the sampled sentence.",
 )
+parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
 
 args = parser.parse_args()
 
@@ -353,29 +354,32 @@ gene_params = {
     "temperature": temperature,
 }
 
+
 if include_original:
     # We also increase by one the n_samples since we will add the original sentence
     batch_sample_size = n_samples + 1
 else:
     batch_sample_size = n_samples
 
+compute_eval_lexile = args.compute_eval_lexile
+
+print("--- Doing evaluation of the model on the val set ---")
+scores = evaluate_model(
+    model=simplifier,
+    coverage_model=coverage_model,
+    dataloader=val_dataloader,
+    lexile_compute=compute_eval_lexile,
+)
+
+eval_log = {f"val/{k}": v for k, v in scores.items()}
+eval_log.update({"training_step": 0})
+wandb.log(eval_log)
+
 for idx, paragraphs in enumerate(train_dataloader):
+    idx += 1
     T_batch_start = time.time()
 
-    if idx == 0:
-        print("--- Doing evaluation of the model on the val set ---")
-        scores = evaluate_model(
-            model=simplifier,
-            coverage_model=coverage_model,
-            dataloader=val_dataloader,
-            n=n_eval,
-        )
-
-        eval_log = {f"val/{k}": v for k, v in scores.items()}
-        wandb.log(
-            eval_log, commit=False
-        )  # commit=false does not increment Steps in log
-
+    # Doing real, sampled generation
     gens_out = simplifier.generate(paragraphs, **gene_params)
 
     if include_original:
@@ -424,7 +428,7 @@ for idx, paragraphs in enumerate(train_dataloader):
     print(
         "[%d steps out of %d] [%d samples] %d above avg and %d below avg with a 0.02 margin."
         % (
-            (idx + 1),
+            idx,
             max_steps,
             train_batch_size * batch_sample_size,
             n_diff_pos,
@@ -439,6 +443,7 @@ for idx, paragraphs in enumerate(train_dataloader):
 
     batch_time = time.time() - T_batch_start
     log_obj = {
+        "training_step": idx,
         "train/loss": loss,
         "train/max_scores": torch.max(RS_j),
         "train/temperature": temperature,
@@ -485,20 +490,19 @@ for idx, paragraphs in enumerate(train_dataloader):
     )
 
     # Since each Wandb.log increase the step, we log the training with the eval to better align results
-    if ((idx % eval_frequency) == 0 or (idx + 1) == max_steps) and idx > 0:
+    if (idx % eval_frequency) == 0 or idx == max_steps:
         torch.cuda.empty_cache()
         print("--- Doing evaluation of the model on the val set ---")
         scores = evaluate_model(
             model=simplifier,
             coverage_model=coverage_model,
             dataloader=val_dataloader,
-            n=n_eval,
+            lexile_compute=compute_eval_lexile,
         )
 
         log_obj.update({f"val/{k}": v for k, v in scores.items()})
-        wandb.log(log_obj)
-    else:
-        wandb.log(log_obj)
+
+    wandb.log(log_obj)
 
     if idx == 100:
         # The first 100 steps, we evaluate it each 10 steps
@@ -518,8 +522,9 @@ scores = evaluate_model(
     model=simplifier,
     coverage_model=coverage_model,
     dataloader=test_dataloader,
-    n=n_eval,
+    lexile_compute=True,
 )
 
 test_log_obj = {f"test/{k}": v for k, v in scores.items()}
-wandb.log(test_log_obj, commit=False)  # commit=false does not increment Steps in log
+test_log_obj.update({"training_step": max_steps})
+wandb.log(test_log_obj)
