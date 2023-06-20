@@ -247,7 +247,7 @@ test_indices_n_eval, _ = random_split(
 test_split_n_eval = test_dataset.select(test_indices_n_eval.indices)
 
 test_dataloader = DataLoader(
-    dataset=test_dataset,
+    dataset=test_split_n_eval,
     batch_size=train_batch_size,
     drop_last=True,
     collate_fn=newsela_collate,
