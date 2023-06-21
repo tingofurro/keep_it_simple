@@ -2,6 +2,7 @@ from functools import partial
 
 import utils_misc
 from tools import bool_parse
+from utils_fluency import pre_process_min_max_fluency_log_probs
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -155,6 +156,8 @@ parser.add_argument(
 )
 parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
 
+parser.add_argument("--fluency_min_max", type=bool_parse, default=False)
+
 args = parser.parse_args()
 
 experiment_name = args.experiment + "_" + socket.gethostname()
@@ -291,6 +294,24 @@ coverage_model = CoverageModel(
     is_soft=True,
 )
 
+if args.fluency_min_max:
+    fluency_model = FluencyRelativeScore()
+
+    log_prob_min, log_prob_max = pre_process_min_max_fluency_log_probs(
+        fluency_model=fluency_model, dataloader=train_dataloader
+    )
+
+    # log_prob_min, log_prob_max = pre_process_min_max_fluency_log_probs(
+    #     DataLoader(
+    #         train_dataset,
+    #         collate_fn=train_collate_fn,
+    #     )
+    # )
+
+    del fluency_model
+else:
+    log_prob_min, log_prob_max = None, None
+
 scorers = [
     {
         "name": "coverage",
@@ -310,7 +331,13 @@ scorers = [
         "sign": 1,
         "weight": 2.0,
     },
-    {"name": "fluency_lm", "model": FluencyRelativeScore(), "sign": 1},
+    {
+        "name": "fluency_lm",
+        "model": FluencyRelativeScore(
+            log_prob_min=log_prob_min, log_prob_max=log_prob_max
+        ),
+        "sign": 1,
+    },
     {
         "name": "fluency_disc",
         "model": TextDiscriminator(retrain_every=800, fp16=True),
@@ -353,7 +380,6 @@ gene_params = {
     "no_copy_ngram": 7,
     "temperature": temperature,
 }
-
 
 if include_original:
     # We also increase by one the n_samples since we will add the original sentence
