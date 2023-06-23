@@ -3,6 +3,7 @@ from functools import partial
 import utils_misc
 from tools import bool_parse
 from utils_fluency import pre_process_min_max_fluency_log_probs
+from utils_train import create_comparison_tag
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -161,6 +162,10 @@ parser.add_argument("--fluency_min_max", type=bool_parse, default=False)
 args = parser.parse_args()
 
 experiment_name = args.experiment + "_" + socket.gethostname()
+
+comparison_tag = create_comparison_tag(args)
+
+vars(args).update({"tag": comparison_tag})
 
 wandb.init(project="keep_it_simple")
 wandb.config.update(args)
