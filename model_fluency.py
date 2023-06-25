@@ -1,25 +1,43 @@
+import collections
+import json
+from collections import Counter
+from typing import Union, List
+
+import numpy as np
+import torch
+import tqdm
+from sklearn.metrics import f1_score
+from torch.cuda.amp import autocast
+from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 from transformers import (
     GPT2LMHeadModel,
     GPT2TokenizerFast,
     RobertaForSequenceClassification,
     RobertaTokenizerFast,
 )
-from torch.utils.data import DataLoader, RandomSampler, TensorDataset
-import numpy as np, tqdm, json, collections, torch
-from sklearn.metrics import f1_score
-from torch.cuda.amp import autocast
-from collections import Counter
+
 import utils_optim
 
 
 class FluencyRelativeScore:
-    def __init__(self, same_length=False):
+    def __init__(
+        self,
+        log_prob_min: Union[float, None] = None,
+        log_prob_max: Union[float, None] = None,
+    ):
         self.model = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
         self.tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
         self.model.half().eval()
-        self.same_length = same_length
 
-    def preprocess_batch(self, decoded):
+        self.log_prob_min = log_prob_min
+        self.log_prob_max = log_prob_max
+
+        if log_prob_min is not None or log_prob_max is not None:
+            self.score = self.min_max_log_likelihood_score
+        else:
+            self.score = self.delta_log_likelihood_score
+
+    def preprocess_batch(self, decoded: List):
         # We cut short, but we want the end token at the end
         max_output_length = 80
         decs = [self.tokenizer.encode(dec) for dec in decoded]
@@ -37,12 +55,8 @@ class FluencyRelativeScore:
         )
         return decs_inp.cuda(), decs_out.cuda()
 
-    def text2loss(self, text, up_to_length=None):
+    def text2loss(self, text: List):
         txt_inp, txt_out = self.preprocess_batch(text)
-
-        if up_to_length is not None:
-            txt_inp = txt_inp[:, :up_to_length]
-            txt_out = txt_out[:, :up_to_length].contiguous()
 
         with torch.no_grad():
             model_outputs = self.model(input_ids=txt_inp, past_key_values=None)
@@ -57,19 +71,28 @@ class FluencyRelativeScore:
             loss_per = torch.sum(loss, dim=1) / non_pad_count
         return loss_per
 
-    def score(self, sources, generateds):
-        up_to_length = None
-        if self.same_length:
-            up_to_length = len(self.tokenizer.encode(generateds[0]))
-
-        sources_score = self.text2loss(sources, up_to_length=up_to_length)
-        generateds_score = self.text2loss(generateds, up_to_length=up_to_length)
+    def delta_log_likelihood_score(self, sources, generateds):
+        sources_score = self.text2loss(sources)
+        generateds_score = self.text2loss(generateds)
         scores = (1.3 + sources_score - generateds_score) / 1.3
         scores = torch.clamp(scores, 0.001, 1.0).tolist()
 
         return {
             "scores": scores,
             "sources_loss": sources_score,
+            "generateds_loss": generateds_score,
+        }
+
+    def min_max_log_likelihood_score(self, sources, generateds):
+        generateds_score = self.text2loss(generateds)
+
+        scores = (generateds_score - self.log_prob_min) / (
+            self.log_prob_max - self.log_prob_min
+        )
+        scores = torch.clamp(scores, 0.001, 1.0).tolist()
+
+        return {
+            "scores": scores,
             "generateds_loss": generateds_score,
         }
 
