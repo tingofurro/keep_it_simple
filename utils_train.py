@@ -15,6 +15,12 @@ def create_comparison_tag(args: Union[Namespace, Dict]):
     if config.get("include_original"):
         comparison_tag = "Original in S"
 
+    if config.get("reward_components_weights"):
+        if comparison_tag == "Baseline":
+            comparison_tag = "No weights"
+        else:
+            comparison_tag = f"{comparison_tag}, no weights"
+
     if config.get("fluency_min_max"):
         if comparison_tag == "Baseline":
             comparison_tag = "Fluency min-max"

@@ -156,8 +156,8 @@ parser.add_argument(
     help="Whether to include the original sentence in the sampled sentence.",
 )
 parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
-parser.add_argument("--fluency_min_max", type=bool_parse, default=False)
 parser.add_argument("--reward_components_weights", type=bool_parse, default=True)
+parser.add_argument("--fluency_min_max", type=bool_parse, default=False)
 
 
 args = parser.parse_args()
