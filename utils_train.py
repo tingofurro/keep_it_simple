@@ -15,7 +15,8 @@ def create_comparison_tag(args: Union[Namespace, Dict]):
     if config.get("include_original"):
         comparison_tag = "Original in S"
 
-    if config.get("reward_components_weights"):
+    if not config.get("reward_components_weights"):
+        # If True = include weights, if False = does not include weights.
         if comparison_tag == "Baseline":
             comparison_tag = "No weights"
         else:
