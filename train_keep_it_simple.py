@@ -2,6 +2,8 @@ from functools import partial
 
 import utils_misc
 from tools import bool_parse
+from utils_fluency import pre_process_min_max_fluency_log_probs
+from utils_train import create_comparison_tag
 
 freer_gpu = utils_misc.select_freer_gpu()
 
@@ -154,13 +156,17 @@ parser.add_argument(
     help="Whether to include the original sentence in the sampled sentence.",
 )
 parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
-
+parser.add_argument("--fluency_min_max", type=bool_parse, default=False)
 parser.add_argument("--reward_components_weights", type=bool_parse, default=True)
 
 
 args = parser.parse_args()
 
 experiment_name = args.experiment + "_" + socket.gethostname()
+
+comparison_tag = create_comparison_tag(args)
+
+vars(args).update({"tag": comparison_tag})
 
 wandb.init(project="keep_it_simple")
 wandb.config.update(args)
@@ -294,6 +300,16 @@ coverage_model = CoverageModel(
     is_soft=True,
 )
 
+if args.fluency_min_max:
+    fluency_model = FluencyRelativeScore()
+
+    log_prob_min, log_prob_max = pre_process_min_max_fluency_log_probs(
+        fluency_model=fluency_model, dataloader=train_dataloader
+    )
+    del fluency_model
+else:
+    log_prob_min, log_prob_max = None, None
+
 reward_components_weights = args.reward_components_weights
 if reward_components_weights:
     scorers = [
@@ -315,7 +331,13 @@ if reward_components_weights:
             "sign": 1,
             "weight": 2.0,
         },
-        {"name": "fluency_lm", "model": FluencyRelativeScore(), "sign": 1},
+        {
+            "name": "fluency_lm",
+            "model": FluencyRelativeScore(
+                log_prob_min=log_prob_min, log_prob_max=log_prob_max
+            ),
+            "sign": 1,
+        },
         {
             "name": "fluency_disc",
             "model": TextDiscriminator(retrain_every=800, fp16=True),
@@ -360,7 +382,13 @@ else:
             "sign": 1,
             "weight": 1.0,
         },
-        {"name": "fluency_lm", "model": FluencyRelativeScore(), "sign": 1},
+        {
+            "name": "fluency_lm",
+            "model": FluencyRelativeScore(
+                log_prob_min=log_prob_min, log_prob_max=log_prob_max
+            ),
+            "sign": 1,
+        },
         {
             "name": "fluency_disc",
             "model": TextDiscriminator(retrain_every=800, fp16=True),
@@ -387,6 +415,7 @@ else:
         },
     ]
 
+
 scorer = utils_scoring.ScorerWrapper(
     scorers, scoring_method=args.scoring, max_batch_size=12
 )
@@ -404,7 +433,6 @@ gene_params = {
     "no_copy_ngram": 7,
     "temperature": temperature,
 }
-
 
 if include_original:
     # We also increase by one the n_samples since we will add the original sentence
