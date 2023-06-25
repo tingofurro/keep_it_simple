@@ -155,6 +155,9 @@ parser.add_argument(
 )
 parser.add_argument("--compute_eval_lexile", type=bool_parse, default=False)
 
+parser.add_argument("--reward_components_weights", type=bool_parse, default=True)
+
+
 args = parser.parse_args()
 
 experiment_name = args.experiment + "_" + socket.gethostname()
@@ -291,50 +294,98 @@ coverage_model = CoverageModel(
     is_soft=True,
 )
 
-scorers = [
-    {
-        "name": "coverage",
-        "model": coverage_model,
-        "sign": 1,
-        "weight": 2.0,
-    },
-    {
-        "name": "simple_syn",
-        "model": SimplicitySyntacticScore(),
-        "sign": 1,
-        "weight": 4.0,
-    },
-    {
-        "name": "simple_lex",
-        "model": SimplicityLexicalScore(target_shift=0.4, word_change_ratio=0.15),
-        "sign": 1,
-        "weight": 2.0,
-    },
-    {"name": "fluency_lm", "model": FluencyRelativeScore(), "sign": 1},
-    {
-        "name": "fluency_disc",
-        "model": TextDiscriminator(retrain_every=800, fp16=True),
-        "sign": 1,
-    },
-    {
-        "name": "gr_repeat_penalty",
-        "model": RepeatNGramPenalty(gram=3),
-        "sign": -1,
-        "weight": 2.0,
-    },
-    {
-        "name": "gr_brevity_penalty",
-        "model": RelativeBrevityPenalizer(min_ratio=0.6, max_ratio=1.3),
-        "sign": -1,
-        "weight": 2.0,
-    },
-    {
-        "name": "gr_hallucination_penalty",
-        "model": NERInaccuracyPenalty(),
-        "sign": -1,
-        "weight": 2.0,
-    },
-]
+reward_components_weights = args.reward_components_weights
+if reward_components_weights:
+    scorers = [
+        {
+            "name": "coverage",
+            "model": coverage_model,
+            "sign": 1,
+            "weight": 2.0,
+        },
+        {
+            "name": "simple_syn",
+            "model": SimplicitySyntacticScore(),
+            "sign": 1,
+            "weight": 4.0,
+        },
+        {
+            "name": "simple_lex",
+            "model": SimplicityLexicalScore(target_shift=0.4, word_change_ratio=0.15),
+            "sign": 1,
+            "weight": 2.0,
+        },
+        {"name": "fluency_lm", "model": FluencyRelativeScore(), "sign": 1},
+        {
+            "name": "fluency_disc",
+            "model": TextDiscriminator(retrain_every=800, fp16=True),
+            "sign": 1,
+        },
+        {
+            "name": "gr_repeat_penalty",
+            "model": RepeatNGramPenalty(gram=3),
+            "sign": -1,
+            "weight": 2.0,
+        },
+        {
+            "name": "gr_brevity_penalty",
+            "model": RelativeBrevityPenalizer(min_ratio=0.6, max_ratio=1.3),
+            "sign": -1,
+            "weight": 2.0,
+        },
+        {
+            "name": "gr_hallucination_penalty",
+            "model": NERInaccuracyPenalty(),
+            "sign": -1,
+            "weight": 2.0,
+        },
+    ]
+else:
+    scorers = [
+        {
+            "name": "coverage",
+            "model": coverage_model,
+            "sign": 1,
+            "weight": 1.0,
+        },
+        {
+            "name": "simple_syn",
+            "model": SimplicitySyntacticScore(),
+            "sign": 1,
+            "weight": 1.0,
+        },
+        {
+            "name": "simple_lex",
+            "model": SimplicityLexicalScore(target_shift=0.4, word_change_ratio=0.15),
+            "sign": 1,
+            "weight": 1.0,
+        },
+        {"name": "fluency_lm", "model": FluencyRelativeScore(), "sign": 1},
+        {
+            "name": "fluency_disc",
+            "model": TextDiscriminator(retrain_every=800, fp16=True),
+            "weight": 1.0,
+            "sign": 1,
+        },
+        {
+            "name": "gr_repeat_penalty",
+            "model": RepeatNGramPenalty(gram=3),
+            "sign": -1,
+            "weight": 1.0,
+        },
+        {
+            "name": "gr_brevity_penalty",
+            "model": RelativeBrevityPenalizer(min_ratio=0.6, max_ratio=1.3),
+            "sign": -1,
+            "weight": 1.0,
+        },
+        {
+            "name": "gr_hallucination_penalty",
+            "model": NERInaccuracyPenalty(),
+            "sign": -1,
+            "weight": 1.0,
+        },
+    ]
 
 scorer = utils_scoring.ScorerWrapper(
     scorers, scoring_method=args.scoring, max_batch_size=12
