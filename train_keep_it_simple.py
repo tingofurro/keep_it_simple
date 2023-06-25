@@ -165,6 +165,7 @@ args = parser.parse_args()
 experiment_name = args.experiment + "_" + socket.gethostname()
 
 comparison_tag = create_comparison_tag(args)
+print(f"---------------------------- {comparison_tag} ----------------------------")
 
 vars(args).update({"tag": comparison_tag})
 
